@@ -1,0 +1,95 @@
+version: '3.8'
+
+services:
+  # 백엔드 서비스
+  aibackend:
+    build:
+      context: ./aibackend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./aibackend:/app
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_ALGORITHM=${JWT_ALGORITHM}
+      - JWT_EXPIRATION_MINUTES=${JWT_EXPIRATION_MINUTES}
+    depends_on:
+      - mysql
+    networks:
+      - stock_net
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  # 데이터 파이프라인 서비스
+  data_pipelines:
+    build:
+      context: ./data_pipelines
+      dockerfile: Dockerfile
+    volumes:
+      - ./data_pipelines:/app
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - ALPHA_VANTAGE_API_KEY=${ALPHA_VANTAGE_API_KEY}
+      - POLYGON_API_KEY=${POLYGON_API_KEY}
+    depends_on:
+      - mysql
+    networks:
+      - stock_net
+    command: python -m scheduler.schedule
+
+  # AI 컴포넌트 서비스
+  ai_components:
+    build:
+      context: ./ai_components
+      dockerfile: Dockerfile
+    volumes:
+      - ./ai_components:/app
+    environment:
+      - VECTOR_DB_URL=${VECTOR_DB_URL}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    depends_on:
+      - mysql_vector
+    networks:
+      - stock_net
+
+  # MySQL 데이터베이스
+  mysql:
+    image: mysql:8.0
+    ports:
+      - "3306:3306"
+    environment:
+      - MYSQL_ROOT_PASSWORD=rootpassword
+      - MYSQL_USER=stockuser
+      - MYSQL_PASSWORD=stockpassword
+      - MYSQL_DATABASE=stock_db
+    volumes:
+      - mysql_data:/var/lib/mysql
+    command: --default-authentication-plugin=mysql_native_password
+    networks:
+      - stock_net
+
+  # 벡터 데이터베이스 (MySQL)
+  mysql_vector:
+    image: mysql:8.0
+    ports:
+      - "3307:3306"
+    environment:
+      - MYSQL_ROOT_PASSWORD=rootpassword
+      - MYSQL_USER=vectoruser
+      - MYSQL_PASSWORD=vectorpassword
+      - MYSQL_DATABASE=vector_db
+    volumes:
+      - mysql_vector_data:/var/lib/mysql
+    command: --default-authentication-plugin=mysql_native_password
+    networks:
+      - stock_net
+
+volumes:
+  mysql_data:
+  mysql_vector_data:
+
+networks:
+  stock_net:
+    driver: bridge 
