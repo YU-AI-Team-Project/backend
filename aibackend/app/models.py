@@ -1,7 +1,8 @@
-from sqlalchemy import Integer, String, Boolean, ForeignKey
+from sqlalchemy import Integer, String, Boolean, ForeignKey, Text
 from sqlalchemy.orm import mapped_column, relationship
 from .database import Base
 
+#사용자 테이블
 class User(Base):
     __tablename__ = "users"
     id = mapped_column(Integer,primary_key=True, autoincrement=True)
@@ -10,6 +11,7 @@ class User(Base):
     
     interests = relationship("InterestStock",back_populates="user",cascade="all, delete-orphan")
     
+#종목 테이블
 class Stock(Base):
     __tablename__ = "stocks"
     id = mapped_column(String(4),primary_key=True)
@@ -19,6 +21,7 @@ class Stock(Base):
     
     interests = relationship("InterestStock", back_populates="stock", cascade="all, delete-orphan")
     
+#관심종목 테이블(User,Stock M:N관계)
 class InterestStock(Base):
     __tablename__ = "interest_stocks"
     id = mapped_column(Integer,primary_key=True,autoincrement=True)
