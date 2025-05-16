@@ -40,3 +40,10 @@ class StockDetailResponse(BaseModel):
     financial_statements: List[FinancialStatementBase]
     market_indicators: List[MarketIndicatorBase]
     earnings_forecasts: List[EarningsForecastBase]
+    
+class InterestStockInfo(BaseModel):
+    stock_code: str
+    company_name: str
+    
+class InterestStockResponse(BaseModel):
+    interests: List[InterestStockInfo]

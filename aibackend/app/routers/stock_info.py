@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.models import Stock, FinancialStatement, MarketIndicator, EarningsForecast
+from app.models import User,Stock,InterestStock, FinancialStatement, MarketIndicator, EarningsForecast
 from app import schemas
 
 router = APIRouter()
@@ -63,3 +63,32 @@ def get_stock_detail(stock_code: str, db: Session = Depends(get_db)):
             } for e in forecasts
         ]
     }
+    
+@router.get("/stocks/interests/{userID}",summary="사용자 관심종목 조회",response_model=schemas.InterestStockResponse)
+def get_my_interest_stocks(userID:str, db: Session = Depends(get_db)):
+    #1 userID로 사용자 테이블 ID 조회
+    user = db.query(User).filter(User.userID == userID).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="해당 사용자를 찾을 수 없습니다")
+    
+    print("userID는"+str(user.id))
+    # 2. 사용자 ID로 관심종목 조회
+    interests = (
+        db.query(InterestStock)
+        .join(User)
+        .filter(InterestStock.user_id == user.id)
+        .all()
+    )
+    
+    if not interests:
+        raise HTTPException(status_code=404, detail="관심 종목이 없습니다")
+    
+    result = [
+        schemas.InterestStockInfo(
+            stock_code=i.stock_code,
+            company_name=i.stock.company_name
+        )
+        for i in interests
+    ]
+    
+    return {"interests":result}
