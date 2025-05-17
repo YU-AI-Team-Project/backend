@@ -4,14 +4,13 @@ from urllib.parse import urlparse, parse_qs, unquote
 import random
 from urllib.parse import urljoin
 import requests
+import json, pathlib
 
-date = "2025-05-17"
+date = "2025-05-16"
 url = f"https://finance.naver.com/news/mainnews.naver?date={date}"
 BASE = "https://n.news.naver.com"
-
-response = requests.get(url)
-html = response.text
-soup = BeautifulSoup(html, "lxml")
+CSV_NAME = f"naverfinance_mainnews_{date}.csv"
+MAX_PAGES = 10
 
 articles = []
 
@@ -34,29 +33,36 @@ def news_read_to_mnews(url: str) -> str:
     aid = qs.get("article_id", [""])[0]
     return f"https://n.news.naver.com/mnews/article/{oid}/{aid}" if oid and aid else url
 
+for page_no in range(1, MAX_PAGES + 1):
+    time.sleep(random.uniform(1.5, 3.0))
+    url = f"https://finance.naver.com/news/mainnews.naver?date={date}&page={page_no}"
+    response = requests.get(url)
+    html = response.text
+    soup = BeautifulSoup(html, "lxml")
 
-for li in soup.select("div.mainNewsList li.block1"):   # 카드 전부 순회
-    title_a = li.select_one("dd.articleSubject > a[href]")
-    press   = li.select_one("dd.articleSummary span.press")
-    wdate   = li.select_one("dd.articleSummary span.wdate")
+    print(f"\n🔄 [목록] page {page_no} 요청 → {url}")
 
-    url = news_read_to_mnews(title_a["href"])
+    for li in soup.select("div.mainNewsList li.block1"):   # 카드 전부 순회
+        title_a = li.select_one("dd.articleSubject > a[href]")
+        press   = li.select_one("dd.articleSummary span.press")
+        wdate   = li.select_one("dd.articleSummary span.wdate")
 
-    if not title_a:
-        continue   # 제목 링크가 없으면 스킵
+        if not title_a:
+            continue
 
-    articles.append({
-        "title": title_a.get_text(strip=True),
-        "url":   url,         # 이미 https://n.news.naver.com/…
-        "press": press.get_text(strip=True) if press else "",
-        "time":  wdate.get_text(strip=True) if wdate else ""
-    })
-
-    print(articles)
+        url = news_read_to_mnews(title_a["href"])
+        articles.append({
+            "title": title_a.get_text(strip=True),
+            "url":   url,         # 이미 https://n.news.naver.com/…
+            "press": press.get_text(strip=True) if press else "",
+            "time":  wdate.get_text(strip=True) if wdate else ""
+        })
+    
+    print(f"📄 page {page_no} 수집 완료 (기사 {len(articles)}개)")
 
 full = []
 
-for idx, art in enumerate(articles[:10], start=1):
+for idx, art in enumerate(articles, start=1):
     time.sleep(random.uniform(1.5, 3.0))        # 딜레이
 
     res = requests.get(art["url"], headers=headers, timeout=10)
@@ -69,7 +75,15 @@ for idx, art in enumerate(articles[:10], start=1):
     art["content"] = body.get_text(strip=True) if body else ""
     full.append(art)
 
+    print(f"✅ page {idx} 본문 저장")
+
 # 💾 STEP 3: 저장
 df = pd.DataFrame(full or articles)
-df.to_csv("naver_news.csv", index=False, encoding="utf-8-sig")
-print("\n✅ CSV 저장 완료: naver_news.csv")
+df.to_csv(CSV_NAME, index=False, encoding="utf-8-sig")
+print("\n✅ CSV 저장 완료: {CSV_NAME}")
+
+path = pathlib.Path("CSV_NAME.jsonl")
+with path.open("w", encoding="utf-8") as f:
+    for art in full:
+        f.write(json.dumps(art, ensure_ascii=False) + "\n")
+print(f"\n✅ JSONL 저장 완료: {path}")
