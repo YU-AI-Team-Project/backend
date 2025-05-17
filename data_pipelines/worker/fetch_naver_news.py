@@ -1,6 +1,7 @@
 import time, requests, pandas as pd
 from bs4 import BeautifulSoup, Tag
 from urllib.parse import urlparse, parse_qs, unquote
+import random
 
 response = requests.get("https://search.naver.com/search.naver?ssc=tab.news.all&where=news&sm=tab_jum&query=%EC%82%BC%EC%84%B1%EC%A0%84%EC%9E%90")
 
@@ -40,9 +41,6 @@ for wrapper in soup.select('span.sds-comps-profile-info-subtext'):   # list<Tag>
 full_articles = []
 
 for index, article in enumerate(articles):
-    if index > 10:
-        break
-    
     url = article["url"]
 
     try:
@@ -73,7 +71,7 @@ for index, article in enumerate(articles):
         "url": url
     })
 
-    time.sleep(1.5)  # 서버에 부담 주지 않도록
+    time.sleep(random.uniform(1.5, 3.5))  # 서버에 부담 주지 않도록
 
 # 💾 STEP 3: 저장
 df = pd.DataFrame(full_articles)
