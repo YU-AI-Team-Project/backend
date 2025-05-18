@@ -2,16 +2,14 @@ import pandas as pd
 import yfinance as yf
 from datetime import datetime
 from sqlalchemy.sql import text
+from time import sleep
 
-def fetch_and_store(ticker, engine, logging):
+def fetch_and_store(ticker, engine):
     try:
+        sleep(1.0)
         stock = yf.Ticker(ticker)
         info = stock.info
         hist = stock.history(period="1d")
-
-        if hist.empty:
-            logging.warning(f"{ticker}: 가격 데이터 없음")
-            return
 
         close_price = hist['Close'].iloc[-1]
         date = hist.index[-1].date()
@@ -30,7 +28,25 @@ def fetch_and_store(ticker, engine, logging):
             'created_at': datetime.now()
         }
 
-        with engine.connect() as conn:
+        print(info.get('longName', 'N/A'))
+
+        print(row)
+
+        print("🔌 연결 시도 중...")
+        with engine.begin() as conn:
+            print("✅ 연결 성공")
+
+            exists = conn.execute(
+                text("SELECT 1 FROM stocks WHERE code = :code"),
+                {"code": ticker}
+            ).fetchone()
+
+            if not exists:
+                conn.execute(
+                    text("INSERT INTO stocks (code, company_name) VALUES (:code, :company_name)"),
+                    {"code": ticker, "company_name": info.get('longName', 'N/A')}
+                )
+
             result = conn.execute(
                 text("SELECT COUNT(*) FROM market_indicators WHERE stock_code = :code AND date = :date"),
                 {"code": ticker, "date": date}
@@ -38,9 +54,9 @@ def fetch_and_store(ticker, engine, logging):
             count = result.scalar()
 
             df = pd.DataFrame([row])
+
             if count == 0:
                 df.to_sql("market_indicators", con=engine, if_exists="append", index=False)
-                logging.info(f"{ticker}: {date} 신규 데이터 추가")
             else:
                 conn.execute(
                     text("""
@@ -52,6 +68,7 @@ def fetch_and_store(ticker, engine, logging):
                     """),
                     row
                 )
-                logging.info(f"{ticker}: {date} 기존 데이터 갱신")
+            print(f"{ticker}: 수집 완료")
+            
     except Exception as e:
-        logging.error(f"{ticker}: 수집 실패 - {e}")
+        print(f"{ticker}: 수집 실패 - {e}")
