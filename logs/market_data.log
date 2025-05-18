@@ -1,0 +1,11 @@
+2025-05-18 17:26:28,923 - INFO - 시세 수집기 실행 시작
+2025-05-18 17:26:32,603 - ERROR - AAPL: 수집 실패 - (pymysql.err.OperationalError) (1045, "Access denied for user 'root'@'211.112.158.113' (using password: YES)")
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2025-05-18 17:26:34,754 - ERROR - MSFT: 수집 실패 - (pymysql.err.OperationalError) (1045, "Access denied for user 'root'@'211.112.158.113' (using password: YES)")
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2025-05-18 17:26:36,597 - ERROR - NVDA: 수집 실패 - (pymysql.err.OperationalError) (1045, "Access denied for user 'root'@'211.112.158.113' (using password: YES)")
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2025-05-18 17:26:38,440 - ERROR - GOOGL: 수집 실패 - (pymysql.err.OperationalError) (1045, "Access denied for user 'root'@'211.112.158.113' (using password: YES)")
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2025-05-18 17:26:40,591 - ERROR - AMZN: 수집 실패 - (pymysql.err.OperationalError) (1045, "Access denied for user 'root'@'211.112.158.113' (using password: YES)")
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
