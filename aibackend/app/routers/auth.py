@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Request, Form, Response, Depends, HTTPException, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
-from app import models
-from app.database import get_db
+from aibackend.app import models
+from aibackend.app.database import get_db
 
 
 router = APIRouter()

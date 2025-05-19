@@ -1,8 +1,8 @@
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
-from app.database import get_db
-from app.models import User,Stock,InterestStock, FinancialStatement, MarketIndicator, EarningsForecast
-from app import schemas
+from aibackend.app.database import get_db
+from aibackend.app.models import User,Stock,InterestStock, FinancialStatement, MarketIndicator, EarningsForecast
+from aibackend.app import schemas
 
 router = APIRouter()
 

@@ -46,6 +46,8 @@ def fetch_and_store(ticker, engine):
                     text("INSERT INTO stocks (code, company_name) VALUES (:code, :company_name)"),
                     {"code": ticker, "company_name": info.get('longName', 'N/A')}
                 )
+            
+            print(f"{ticker}: 연결 성공")
 
             result = conn.execute(
                 text("SELECT COUNT(*) FROM market_indicators WHERE stock_code = :code AND date = :date"),
@@ -56,7 +58,12 @@ def fetch_and_store(ticker, engine):
             df = pd.DataFrame([row])
 
             if count == 0:
-                df.to_sql("market_indicators", con=engine, if_exists="append", index=False)
+                conn.execute(
+                    text("""
+                        INSERT INTO market_indicators (stock_code, date, market_cap, per, pbr, eps, bps, dividend_yield, close_price, created_at)
+                        VALUES (:stock_code, :date, :market_cap, :per, :pbr, :eps, :bps, :dividend_yield, :close_price, :created_at)
+                    """), row
+                )
             else:
                 conn.execute(
                     text("""

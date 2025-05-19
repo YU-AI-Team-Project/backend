@@ -1,7 +1,7 @@
 from fastapi import FastAPI
-from app import models
-from app.database import engine
-from app.routers import auth, stock_info
+from aibackend.app import models
+from aibackend.app.database import engine
+from aibackend.app.routers import auth, stock_info
 
 app = FastAPI()
 
