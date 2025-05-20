@@ -1,7 +1,10 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base, Session
 from dotenv import load_dotenv
+from typing import List
 import os
+
+from news_vector import NewsVector
 
 load_dotenv()
 
@@ -23,3 +26,10 @@ def get_news_db():
         yield db
     finally:
         db.close()
+        
+    
+def save_news_vectors(session: Session, news_list: List[NewsVector]):
+    if not news_list:
+        return
+    session.add_all(news_list)
+    session.commit()

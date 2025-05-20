@@ -1,17 +1,45 @@
-version: '3.8'
-
 services:
+  app:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    environment:
+      - PORT=${PORT}
+
+      # MySQL
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=${DB_PORT}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
+
+      # PostgreSQL
+      - NEWS_DB_HOST=${NEWS_DB_HOST}
+      - NEWS_DB_PORT=${NEWS_DB_PORT}
+      - NEWS_DB_USER=${NEWS_DB_USER}
+      - NEWS_DB_PASSWORD=${NEWS_DB_PASSWORD}
+      - NEWS_DB_NAME=${NEWS_DB_NAME}
+
+      # API Key
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    restart: unless-stopped
+    depends_on:
+      - db
+
   db:
     image: ankane/pgvector
-    container_name: news_pgvector
     ports:
       - "5432:5432"
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_PASSWORD: Abcd1234!
       POSTGRES_DB: news_db
     volumes:
-      - pg_data:/var/lib/postgresql/pg_data
-  
+      - pg_data:/var/lib/postgresql/data
+
 volumes:
   pg_data:
