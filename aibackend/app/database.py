@@ -9,7 +9,7 @@ import os
 load_dotenv()
 
 user = os.getenv("DB_USER")
-passwd = os.getenv("DB_PASSWD")
+passwd = os.getenv("DB_PASSWORD")
 host = os.getenv("DB_HOST")
 port = os.getenv("DB_PORT")
 db = os.getenv("DB_NAME")
@@ -20,7 +20,7 @@ unix_socket_path = f"/cloudsql/{instance_connection_name}"
 
 DB_URL = f"mysql+pymysql://{user}:{passwd}@/{db}?unix_socket={unix_socket_path}&charset=utf8mb4"'''
 
-DB_URL = f"mysql+pymysql://{user}:{passwd}@{host}:{port}/{db}&charset=utf8mb4"
+DB_URL = f"mysql+pymysql://{user}:{passwd}@{host}:{port}/{db}?charset=utf8mb4"
 
 engine = create_engine(DB_URL,echo=True)
 SessionLocal = sessionmaker(autocommit=False,autoflush=False,bind=engine)
