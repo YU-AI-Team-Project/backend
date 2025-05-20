@@ -4,12 +4,10 @@ from dotenv import load_dotenv
 from typing import List
 import os
 
-from news_vector import NewsVector
-
 load_dotenv()
 
 pg_user = os.getenv("NEWS_DB_USER")
-pg_passwd = os.getenv("NEWS_DB_PASSWD")
+pg_passwd = os.getenv("NEWS_DB_PASSWORD")
 pg_host = os.getenv("NEWS_DB_HOST")
 pg_port = os.getenv("NEWS_DB_PORT")
 pg_db = os.getenv("NEWS_DB_NAME")
@@ -28,7 +26,7 @@ def get_news_db():
         db.close()
         
     
-def save_news_vectors(session: Session, news_list: List[NewsVector]):
+def save_news_vectors(session: Session, news_list: List):
     if not news_list:
         return
     session.add_all(news_list)
