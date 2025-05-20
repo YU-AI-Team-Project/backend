@@ -5,3 +5,5 @@ pymysql
 python-dotenv
 Jinja2
 python-multipart
+pycopg2
+pgvector
