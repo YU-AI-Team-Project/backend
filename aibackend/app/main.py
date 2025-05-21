@@ -1,9 +1,21 @@
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from aibackend.app import models
 from aibackend.app.database import engine
 from aibackend.app.routers import auth, stock_info
 
 app = FastAPI()
+
+#--------------------------배포용--------------------------------
+# React 정적 파일 제공
+app.mount("/static", StaticFiles(directory="frontend/static"), name="static")
+
+# 모든 경로 index.html 반환
+@app.get("/{full_path:path}")
+def serve_react_app_catch_all(full_path: str):
+    return FileResponse("frontend/index.html")
+#----------------------------------------------------------
 
 #router폴더 생성해서 기능별 API 관리
 app.include_router(auth.router)
