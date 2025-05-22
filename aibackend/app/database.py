@@ -13,7 +13,7 @@ passwd = os.getenv("DB_PASSWORD")
 host = os.getenv("DB_HOST")
 port = os.getenv("DB_PORT")
 db = os.getenv("DB_NAME")
-'''instance_connection_name = os.environ.get("INSTANCE_CONNECTION_NAME")
+instance_connection_name = os.environ.get("INSTANCE_CONNECTION_NAME")
 
 #--------------------------배포용--------------------------------
 # Unix 소켓 경로 
