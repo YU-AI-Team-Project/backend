@@ -6,7 +6,7 @@ import enum
 # 보고서 종류 Enum
 class ReportType(str, enum.Enum):
     annual = "annual"
-    quarter = "quarter"
+    quarterly = "quarterly"
 
 # 사용자 테이블
 class User(Base):

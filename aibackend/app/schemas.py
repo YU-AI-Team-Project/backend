@@ -11,28 +11,28 @@ class StockBase(BaseModel):
 class FinancialStatementBase(BaseModel):
     report_period: str
     report_type: str
-    revenue: float
-    operating_income: float
-    net_income: float
-    assets: float
-    liabilities: float
-    equity: float
+    revenue: Optional[float]
+    operating_income: Optional[float]
+    net_income: Optional[float]
+    assets: Optional[float]
+    liabilities: Optional[float]
+    equity: Optional[float]
 
 class MarketIndicatorBase(BaseModel):
     date: date
-    market_cap: float
-    per: float
-    pbr: float
-    eps: float
-    bps: float
-    dividend_yield: float
-    close_price: float
+    market_cap: Optional[float]
+    per: Optional[float]
+    pbr: Optional[float]
+    eps: Optional[float]
+    bps: Optional[float]
+    dividend_yield: Optional[float]
+    close_price: Optional[float]
 
 class EarningsForecastBase(BaseModel):
     fiscal_year: int
-    expected_eps: float
-    expected_revenue: float
-    expected_operating_income: float
+    expected_eps: Optional[float]
+    expected_revenue: Optional[float]
+    expected_operating_income: Optional[float]
     source: str
 
 class StockDetailResponse(BaseModel):
