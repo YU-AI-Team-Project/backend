@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Request, Form, Response, Depends, HTTPException, status
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from sqlalchemy.orm import Session
 from aibackend.app import models
 from aibackend.app.database import get_db
@@ -35,7 +35,6 @@ def read_root(request:Request):
 
 @router.post("/login",summary="로그인 API")
 def login(
-    response: Response,
     username: str = Form(...),
     password: str = Form(...),
     db: Session = Depends(get_db)
@@ -44,14 +43,23 @@ def login(
     user = db.query(models.User).filter(models.User.userID == username).first()
     
     if user and user.passwd == password:
-        response = RedirectResponse("/",status_code=302)
+        response = JSONResponse(
+            content={"message": "로그인 성공", "username": username},
+            status_code=200
+        )
         response.set_cookie(key="username",value=username)
         return response
-    return HTMLResponse("로그인 실패",status_code=401)
+    return JSONResponse(
+        content={"message": "로그인 실패"},
+        status_code=401
+    )
 
 @router.get("/logout",summary="로그아웃 API")
-def logout(response: Response):
-    response = RedirectResponse("/",status_code=302)
+def logout():
+    response = JSONResponse(
+        content={"message": "로그아웃 성공"},
+        status_code=200
+    )
     response.delete_cookie("username")
     return response
     
