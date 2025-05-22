@@ -7,6 +7,10 @@ from aibackend.app.routers import auth, stock_info
 
 app = FastAPI()
 
+#router폴더 생성해서 기능별 API 관리
+app.include_router(auth.router, prefix="/auth")
+app.include_router(stock_info.router, prefix="/stocks")
+
 #--------------------------배포용--------------------------------
 # React 정적 파일 제공
 app.mount("/static", StaticFiles(directory="frontend/static"), name="static")
@@ -16,10 +20,6 @@ app.mount("/static", StaticFiles(directory="frontend/static"), name="static")
 def serve_react_app_catch_all(full_path: str):
     return FileResponse("frontend/index.html")
 #----------------------------------------------------------
-
-#router폴더 생성해서 기능별 API 관리
-app.include_router(auth.router)
-app.include_router(stock_info.router)
 
 
 #서버 실행 시 DB에 테이블이 없다면 models.py에 있는 정보 토대로 자동생성

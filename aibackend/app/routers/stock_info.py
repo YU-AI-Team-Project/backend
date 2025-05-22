@@ -6,7 +6,7 @@ from aibackend.app import schemas
 
 router = APIRouter()
 
-@router.get("/stocks/{stock_code}",summary="기업코드로 종목 정보(기업 정보,재무정보,시장지표,실적정망) 조회",response_model=schemas.StockDetailResponse)
+@router.get("/{stock_code}",summary="기업코드로 종목 정보(기업 정보,재무정보,시장지표,실적정망) 조회",response_model=schemas.StockDetailResponse)
 def get_stock_detail(stock_code: str, db: Session = Depends(get_db)):
     # 종목 기본 정보
     stock = db.query(Stock).filter(Stock.code == stock_code).first()
@@ -64,7 +64,7 @@ def get_stock_detail(stock_code: str, db: Session = Depends(get_db)):
         ]
     }
     
-@router.get("/stocks/interests/{userID}",summary="사용자 관심종목 조회",response_model=schemas.InterestStockResponse)
+@router.get("/interests/{userID}",summary="사용자 관심종목 조회",response_model=schemas.InterestStockResponse)
 def get_my_interest_stocks(userID:str, db: Session = Depends(get_db)):
     #1 userID로 사용자 테이블 ID 조회
     user = db.query(User).filter(User.userID == userID).first()
