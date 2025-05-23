@@ -27,7 +27,10 @@ def get_stock_detail(stock_code: str, db: Session = Depends(get_db)):
             "code": stock.code,
             "company_name": stock.company_name,
             "financial_info": stock.financial_info,
-            "report_url": stock.report_url
+            "report_url": stock.report_url,
+            "industry": stock.industry,
+            "sector": stock.sector,
+            "business_summary": stock.business_summary
         },
         "financial_statements": [
             {
@@ -38,7 +41,25 @@ def get_stock_detail(stock_code: str, db: Session = Depends(get_db)):
                 "net_income": f.net_income,
                 "assets": f.assets,
                 "liabilities": f.liabilities,
-                "equity": f.equity
+                "equity": f.equity,
+                "gross_profits": f.gross_profits,
+                "ebitda": f.ebitda,
+                "operating_cashflow": f.operating_cashflow,
+                "free_cashflow": f.free_cashflow,
+                "revenue_per_share": f.revenue_per_share,
+                "gross_margins": f.gross_margins,
+                "ebitda_margins": f.ebitda_margins,
+                "operating_margins": f.operating_margins,
+                "return_on_assets": f.return_on_assets,
+                "return_on_equity": f.return_on_equity,
+                "debt_to_equity": f.debt_to_equity,
+                "quick_ratio": f.quick_ratio,
+                "current_ratio": f.current_ratio,
+                "earnings_growth": f.earnings_growth,
+                "revenue_growth": f.revenue_growth,
+                "enterprise_value": f.enterprise_value,
+                "enterprise_to_revenue": f.enterprise_to_revenue,
+                "enterprise_to_ebitda": f.enterprise_to_ebitda
             } for f in financials
         ],
         "market_indicators": [
@@ -50,7 +71,31 @@ def get_stock_detail(stock_code: str, db: Session = Depends(get_db)):
                 "eps": m.eps,
                 "bps": m.bps,
                 "dividend_yield": m.dividend_yield,
-                "close_price": m.close_price
+                "close_price": m.close_price,
+                "market": m.market,
+                "exchange": m.exchange,
+                "currency": m.currency,
+                "previous_close": m.previous_close,
+                "open": m.open,
+                "current_price": m.current_price,
+                "day_low": m.day_low,
+                "day_high": m.day_high,
+                "volume": m.volume,
+                "average_volume": m.average_volume,
+                "pe_ratio_trailing": m.pe_ratio_trailing,
+                "pe_ratio_forward": m.pe_ratio_forward,
+                "eps_forward": m.eps_forward,
+                "eps_current_year": m.eps_current_year,
+                "price_eps_current_year": m.price_eps_current_year,
+                "beta": m.beta,
+                "dividend_rate": m.dividend_rate,
+                "dividend_date": m.dividend_date,
+                "ex_dividend_date": m.ex_dividend_date,
+                "payout_ratio": m.payout_ratio,
+                "book_value": m.book_value,
+                "fifty_two_week_low": m.fifty_two_week_low,
+                "fifty_two_week_high": m.fifty_two_week_high,
+                "fifty_two_week_change_percent": m.fifty_two_week_change_percent
             } for m in indicators
         ],
         "earnings_forecasts": [

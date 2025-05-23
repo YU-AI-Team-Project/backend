@@ -1,22 +1,44 @@
 from pydantic import BaseModel
 from typing import List, Optional
 from datetime import date
+from decimal import Decimal
 
 class StockBase(BaseModel):
     code: str
     company_name: str
     financial_info: Optional[str]
     report_url: Optional[str]
+    industry: Optional[str]
+    sector: Optional[str]
+    business_summary: Optional[str]
 
 class FinancialStatementBase(BaseModel):
     report_period: str
     report_type: str
-    revenue: Optional[float]
-    operating_income: Optional[float]
-    net_income: Optional[float]
-    assets: Optional[float]
-    liabilities: Optional[float]
-    equity: Optional[float]
+    revenue: Optional[int]
+    operating_income: Optional[int]
+    net_income: Optional[int]
+    assets: Optional[int]
+    liabilities: Optional[int]
+    equity: Optional[int]
+    gross_profits: Optional[int]
+    ebitda: Optional[int]
+    operating_cashflow: Optional[int]
+    free_cashflow: Optional[int]
+    revenue_per_share: Optional[Decimal]
+    gross_margins: Optional[Decimal]
+    ebitda_margins: Optional[Decimal]
+    operating_margins: Optional[Decimal]
+    return_on_assets: Optional[Decimal]
+    return_on_equity: Optional[Decimal]
+    debt_to_equity: Optional[Decimal]
+    quick_ratio: Optional[Decimal]
+    current_ratio: Optional[Decimal]
+    earnings_growth: Optional[Decimal]
+    revenue_growth: Optional[Decimal]
+    enterprise_value: Optional[int]
+    enterprise_to_revenue: Optional[Decimal]
+    enterprise_to_ebitda: Optional[Decimal]
 
 class MarketIndicatorBase(BaseModel):
     date: date
@@ -27,6 +49,30 @@ class MarketIndicatorBase(BaseModel):
     bps: Optional[float]
     dividend_yield: Optional[float]
     close_price: Optional[float]
+    market: Optional[str]
+    exchange: Optional[str]
+    currency: Optional[str]
+    previous_close: Optional[Decimal]
+    open: Optional[Decimal]
+    current_price: Optional[Decimal]
+    day_low: Optional[Decimal]
+    day_high: Optional[Decimal]
+    volume: Optional[int]
+    average_volume: Optional[int]
+    pe_ratio_trailing: Optional[Decimal]
+    pe_ratio_forward: Optional[Decimal]
+    eps_forward: Optional[Decimal]
+    eps_current_year: Optional[Decimal]
+    price_eps_current_year: Optional[Decimal]
+    beta: Optional[Decimal]
+    dividend_rate: Optional[Decimal]
+    dividend_date: Optional[date]
+    ex_dividend_date: Optional[date]
+    payout_ratio: Optional[Decimal]
+    book_value: Optional[Decimal]
+    fifty_two_week_low: Optional[Decimal]
+    fifty_two_week_high: Optional[Decimal]
+    fifty_two_week_change_percent: Optional[Decimal]
 
 class EarningsForecastBase(BaseModel):
     fiscal_year: int
