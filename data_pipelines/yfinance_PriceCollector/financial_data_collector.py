@@ -176,32 +176,6 @@ def save_stock_info(ticker_symbol, info_data):
     finally:
         session.close()
 
-def get_financial_metrics_from_info(info_data):
-    """
-    yfinance info에서 이미 계산된 재무 지표들을 가져오기
-    """
-    return {
-        # 이미 계산된 재무 지표들
-        'gross_profits': safe_int(info_data.get('grossProfits')),
-        'ebitda': safe_int(info_data.get('ebitda')),
-        'operating_cashflow': safe_int(info_data.get('operatingCashflow')),
-        'free_cashflow': safe_int(info_data.get('freeCashflow')),
-        'revenue_per_share': safe_float(info_data.get('revenuePerShare')),
-        'gross_margins': safe_float(info_data.get('grossMargins')),
-        'ebitda_margins': safe_float(info_data.get('ebitdaMargins')),
-        'operating_margins': safe_float(info_data.get('operatingMargins')),
-        'return_on_assets': safe_float(info_data.get('returnOnAssets')),
-        'return_on_equity': safe_float(info_data.get('returnOnEquity')),
-        'debt_to_equity': safe_float(info_data.get('debtToEquity')),
-        'quick_ratio': safe_float(info_data.get('quickRatio')),
-        'current_ratio': safe_float(info_data.get('currentRatio')),
-        'earnings_growth': safe_float(info_data.get('earningsGrowth')),
-        'revenue_growth': safe_float(info_data.get('revenueGrowth')),
-        'enterprise_value': safe_int(info_data.get('enterpriseValue')),
-        'enterprise_to_revenue': safe_float(info_data.get('enterpriseToRevenue')),
-        'enterprise_to_ebitda': safe_float(info_data.get('enterpriseToEbitda'))
-    }
-
 def process_comprehensive_financial_data(ticker_symbol, financial_data):
     """
     포괄적인 재무 데이터를 처리
@@ -209,8 +183,14 @@ def process_comprehensive_financial_data(ticker_symbol, financial_data):
     result = []
     info_data = financial_data.get('info', {})
     
-    # yfinance에서 이미 계산된 재무 지표들 가져오기
-    financial_metrics = get_financial_metrics_from_info(info_data)
+    # 최신 날짜 찾기 (info_data 지표들을 적용할 기간)
+    latest_date = None
+    for period_type, data in [('annual', financial_data['annual']), ('quarterly', financial_data['quarterly'])]:
+        income_stmt = data.get('income_stmt')
+        if income_stmt is not None and hasattr(income_stmt, 'columns') and len(income_stmt.columns) > 0:
+            period_latest = max(income_stmt.columns)
+            if latest_date is None or period_latest > latest_date:
+                latest_date = period_latest
     
     for period_type, data in [('annual', financial_data['annual']), ('quarterly', financial_data['quarterly'])]:
         income_stmt = data['income_stmt']
@@ -235,16 +215,152 @@ def process_comprehensive_financial_data(ticker_symbol, financial_data):
                 operating_income = income_stmt.loc['Operating Income', date] if 'Operating Income' in income_stmt.index else None
                 net_income = income_stmt.loc['Net Income', date] if 'Net Income' in income_stmt.index else None
                 
-                assets = balance_sheet.loc['Total Assets', date] if 'Total Assets' in balance_sheet.index else None
-                liabilities = balance_sheet.loc['Total Liabilities', date] if 'Total Liabilities' in balance_sheet.index else None
-                equity = balance_sheet.loc['Total Stockholder Equity', date] if 'Total Stockholder Equity' in balance_sheet.index else None
+            
+                
+                # 총자산 추출
+                assets = None
+                for asset_key in ['Total Assets']:
+                    if asset_key in balance_sheet.index:
+                        assets = balance_sheet.loc[asset_key, date]
+                        print(f"[DEBUG] {ticker_symbol}의 총자산을 '{asset_key}'에서 찾음: {assets}")
+                        break
+                
+                # 부채총계 추출
+                liabilities = None
+                for liability_key in ['Total Liabilities Net Minority Interest', 'Total Liabilities']:
+                    if liability_key in balance_sheet.index:
+                        liabilities = balance_sheet.loc[liability_key, date]
+                        print(f"[DEBUG] {ticker_symbol}의 부채총계를 '{liability_key}'에서 찾음: {liabilities}")
+                        break
+                
+                # 자본총계 추출
+                equity = None
+                for equity_key in ['Stockholders Equity', 'Common Stock Equity', 'Total Equity Gross Minority Interest']:
+                    if equity_key in balance_sheet.index:
+                        equity = balance_sheet.loc[equity_key, date]
+                        print(f"[DEBUG] {ticker_symbol}의 자본총계를 '{equity_key}'에서 찾음: {equity}")
+                        break
+                
+                # 자본총계를 찾지 못한 경우 총자산 - 부채총계로 계산 시도
+                if equity is None and assets is not None and liabilities is not None:
+                    if not pd.isna(assets) and not pd.isna(liabilities):
+                        equity = assets - liabilities
+                        print(f"[DEBUG] {ticker_symbol}의 자본총계를 총자산-부채총계로 계산: {equity}")
+                
+                print(f"[DEBUG] {ticker_symbol}의 {period_date} 최종 값들 - 자산: {assets}, 부채: {liabilities}, 자본: {equity}")
                 
                 # 수익이 없거나 NaN인 경우 건너뛰기
                 if revenue is None or pd.isna(revenue):
                     print(f"[WARNING] {ticker_symbol}의 {period_date} 수익 데이터가 없습니다. 건너뜁니다.")
                     continue
                 
-                # 재무제표 레코드 생성 (yfinance에서 가져온 지표들 사용)
+                # 각 기간별로 재무제표에서 실제 데이터 추출
+                gross_profit = None
+                ebitda = None
+                operating_cashflow = None
+                free_cashflow = None
+                
+                print(f"[DEBUG] {ticker_symbol}의 {period_date} 기간 데이터 추출 시작")
+                print(f"[DEBUG] 현재 처리 중인 날짜: {date}")
+                
+                # 손익계산서에서 직접 추출
+                if 'Gross Profit' in income_stmt.index:
+                    gross_profit = income_stmt.loc['Gross Profit', date]
+                    print(f"[DEBUG] {ticker_symbol}의 {period_date} Gross Profit 추출: {gross_profit}")
+                elif 'Cost Of Revenue' in income_stmt.index and revenue is not None:
+                    cost_of_revenue = income_stmt.loc['Cost Of Revenue', date]
+                    print(f"[DEBUG] {ticker_symbol}의 {period_date} Cost Of Revenue: {cost_of_revenue}")
+                    if not pd.isna(cost_of_revenue):
+                        gross_profit = revenue - cost_of_revenue
+                        print(f"[DEBUG] {ticker_symbol}의 {period_date} 계산된 Gross Profit: {gross_profit}")
+                
+                # EBITDA 계산 시도
+                if 'EBITDA' in income_stmt.index:
+                    ebitda = income_stmt.loc['EBITDA', date]
+                    print(f"[DEBUG] {ticker_symbol}의 {period_date} EBITDA 직접 추출: {ebitda}")
+                elif operating_income is not None:
+                    # Operating Income + Depreciation & Amortization
+                    depreciation = None
+                    if 'Depreciation And Amortization' in income_stmt.index:
+                        depreciation = income_stmt.loc['Depreciation And Amortization', date]
+                        print(f"[DEBUG] {ticker_symbol}의 {period_date} 손익계산서 Depreciation: {depreciation}")
+                    elif cashflow_stmt is not None and 'Depreciation And Amortization' in cashflow_stmt.index:
+                        depreciation = cashflow_stmt.loc['Depreciation And Amortization', date]
+                        print(f"[DEBUG] {ticker_symbol}의 {period_date} 현금흐름표 Depreciation: {depreciation}")
+                    
+                    if depreciation is not None and not pd.isna(depreciation):
+                        ebitda = operating_income + depreciation
+                        print(f"[DEBUG] {ticker_symbol}의 {period_date} 계산된 EBITDA: {ebitda}")
+                
+                # 현금흐름표에서 추출
+                if cashflow_stmt is not None and not cashflow_stmt.empty:
+                    if 'Operating Cash Flow' in cashflow_stmt.index:
+                        operating_cashflow = cashflow_stmt.loc['Operating Cash Flow', date]
+                        print(f"[DEBUG] {ticker_symbol}의 {period_date} Operating Cash Flow: {operating_cashflow}")
+                    if 'Free Cash Flow' in cashflow_stmt.index:
+                        free_cashflow = cashflow_stmt.loc['Free Cash Flow', date]
+                        print(f"[DEBUG] {ticker_symbol}의 {period_date} Free Cash Flow: {free_cashflow}")
+                    elif operating_cashflow is not None and 'Capital Expenditure' in cashflow_stmt.index:
+                        capex = cashflow_stmt.loc['Capital Expenditure', date]
+                        if not pd.isna(capex):
+                            free_cashflow = operating_cashflow - abs(capex)
+                            print(f"[DEBUG] {ticker_symbol}의 {period_date} 계산된 Free Cash Flow: {free_cashflow}")
+
+                # 비율 계산 (각 기간별로)
+                gross_margins = None
+                ebitda_margins = None
+                operating_margins = None
+                return_on_assets = None
+                return_on_equity = None
+                debt_to_equity = None
+                current_ratio = None
+                quick_ratio = None
+                
+                if revenue is not None and not pd.isna(revenue) and revenue != 0:
+                    if gross_profit is not None and not pd.isna(gross_profit):
+                        gross_margins = gross_profit / revenue
+                    if ebitda is not None and not pd.isna(ebitda):
+                        ebitda_margins = ebitda / revenue
+                    if operating_income is not None and not pd.isna(operating_income):
+                        operating_margins = operating_income / revenue
+                
+                if assets is not None and not pd.isna(assets) and assets != 0:
+                    if net_income is not None and not pd.isna(net_income):
+                        return_on_assets = net_income / assets
+                
+                if equity is not None and not pd.isna(equity) and equity != 0:
+                    if net_income is not None and not pd.isna(net_income):
+                        return_on_equity = net_income / equity
+                    if liabilities is not None and not pd.isna(liabilities):
+                        debt_to_equity = liabilities / equity
+                
+                # 유동비율 계산
+                if balance_sheet is not None:
+                    current_assets = balance_sheet.loc['Current Assets', date] if 'Current Assets' in balance_sheet.index else None
+                    current_liabilities = balance_sheet.loc['Current Liabilities', date] if 'Current Liabilities' in balance_sheet.index else None
+                    
+                    if (current_assets is not None and current_liabilities is not None and 
+                        not pd.isna(current_assets) and not pd.isna(current_liabilities) and current_liabilities != 0):
+                        current_ratio = current_assets / current_liabilities
+                        
+                        # 당좌비율 (재고자산 제외)
+                        inventory = balance_sheet.loc['Inventory', date] if 'Inventory' in balance_sheet.index else 0
+                        if pd.isna(inventory):
+                            inventory = 0
+                        quick_assets = current_assets - inventory
+                        quick_ratio = quick_assets / current_liabilities
+                
+                # info_data의 지표들을 모든 기간에 적용 (사용자 요구사항)
+                info_metrics = {
+                    'revenue_per_share': safe_float(info_data.get('revenuePerShare'), 0),
+                    'earnings_growth': safe_float(info_data.get('earningsGrowth'), 0),
+                    'revenue_growth': safe_float(info_data.get('revenueGrowth'), 0),
+                    'enterprise_value': safe_int(info_data.get('enterpriseValue'), 0),
+                    'enterprise_to_revenue': safe_float(info_data.get('enterpriseToRevenue'), 0),
+                    'enterprise_to_ebitda': safe_float(info_data.get('enterpriseToEbitda'), 0)
+                }
+                
+                # 재무제표 레코드 생성
                 financial_statement = {
                     'stock_code': ticker_symbol,
                     'report_period': period_date,
@@ -255,8 +371,30 @@ def process_comprehensive_financial_data(ticker_symbol, financial_data):
                     'assets': safe_int(assets),
                     'liabilities': safe_int(liabilities),
                     'equity': safe_int(equity),
-                    **financial_metrics  # yfinance에서 가져온 이미 계산된 지표들
+                    'gross_profits': safe_int(gross_profit),
+                    'ebitda': safe_int(ebitda),
+                    'operating_cashflow': safe_int(operating_cashflow),
+                    'free_cashflow': safe_int(free_cashflow),
+                    'gross_margins': safe_float(gross_margins),
+                    'ebitda_margins': safe_float(ebitda_margins),
+                    'operating_margins': safe_float(operating_margins),
+                    'return_on_assets': safe_float(return_on_assets),
+                    'return_on_equity': safe_float(return_on_equity),
+                    'debt_to_equity': safe_float(debt_to_equity),
+                    'quick_ratio': safe_float(quick_ratio),
+                    'current_ratio': safe_float(current_ratio),
+                    **info_metrics  # 모든 기간에 적용되는 info_data 지표들
                 }
+                
+                # 데이터베이스 저장용 값들 로깅
+                print(f"[DEBUG] {ticker_symbol}의 {period_date} 데이터베이스 저장용 값들:")
+                print(f"  - gross_profits (원본: {gross_profit}) -> safe_int: {safe_int(gross_profit)}")
+                print(f"  - ebitda (원본: {ebitda}) -> safe_int: {safe_int(ebitda)}")
+                print(f"  - operating_cashflow (원본: {operating_cashflow}) -> safe_int: {safe_int(operating_cashflow)}")
+                print(f"  - free_cashflow (원본: {free_cashflow}) -> safe_int: {safe_int(free_cashflow)}")
+                print(f"  - gross_margins (원본: {gross_margins}) -> safe_float: {safe_float(gross_margins)}")
+                print(f"  - revenue_per_share: {info_metrics.get('revenue_per_share')}")
+                print(f"  - earnings_growth: {info_metrics.get('earnings_growth')}")
                 
                 result.append(financial_statement)
                 print(f"[INFO] {ticker_symbol}의 {period_date} {period_type} 포괄적 재무제표 처리 완료")
@@ -413,6 +551,15 @@ def save_comprehensive_financial_data(financial_statements):
     session = SessionLocal()
     try:
         for statement in financial_statements:
+            print(f"[DEBUG] 데이터베이스 저장 시도 - {statement['stock_code']} {statement['report_period']} {statement['report_type']}")
+            print(f"  저장할 값들:")
+            print(f"    gross_profits: {statement.get('gross_profits')}")
+            print(f"    ebitda: {statement.get('ebitda')}")
+            print(f"    operating_cashflow: {statement.get('operating_cashflow')}")
+            print(f"    free_cashflow: {statement.get('free_cashflow')}")
+            print(f"    gross_margins: {statement.get('gross_margins')}")
+            print(f"    revenue_per_share: {statement.get('revenue_per_share')}")
+            
             # 기존 레코드 확인
             query = text("""
                 SELECT id FROM financial_statements 

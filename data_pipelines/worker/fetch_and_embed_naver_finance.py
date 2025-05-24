@@ -27,8 +27,8 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy import Column, Text, DateTime
 
 # ──────────────── 파라미터 ──────────────────────
-START_DATE = "2025-02-21"
-END_DATE = "2025-05-17"
+START_DATE = "2025-04-26"
+END_DATE = "2025-05-24"
 BASE = "https://n.news.naver.com"
 HEADERS = {
     "User-Agent": "Mozilla/5.0"
