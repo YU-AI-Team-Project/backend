@@ -120,14 +120,12 @@ def get_my_interest_stocks(userID:str, db: Session = Depends(get_db)):
     # 2. 사용자 ID로 관심종목 조회
     interests = (
         db.query(InterestStock)
-        .join(User)
+        .join(Stock, InterestStock.stock_code == Stock.code)
         .filter(InterestStock.user_id == user.id)
         .all()
     )
     
-    if not interests:
-        raise HTTPException(status_code=404, detail="관심 종목이 없습니다")
-    
+    # 관심종목이 없어도 빈 배열 반환
     result = [
         schemas.InterestStockInfo(
             stock_code=i.stock_code,
@@ -137,3 +135,66 @@ def get_my_interest_stocks(userID:str, db: Session = Depends(get_db)):
     ]
     
     return {"interests":result}
+
+@router.post("/interests",summary="관심종목 추가",response_model=schemas.InterestStockAddResponse)
+def add_interest_stock(request: schemas.InterestStockAddRequest, db: Session = Depends(get_db)):
+    # 1. userID로 사용자 조회
+    user = db.query(User).filter(User.userID == request.userID).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="해당 사용자를 찾을 수 없습니다")
+    
+    # 2. stock_code로 종목 조회
+    stock = db.query(Stock).filter(Stock.code == request.stock_code).first()
+    if not stock:
+        raise HTTPException(status_code=404, detail="해당 종목을 찾을 수 없습니다")
+    
+    # 3. 이미 관심종목으로 등록되어 있는지 확인
+    existing_interest = db.query(InterestStock).filter(
+        InterestStock.user_id == user.id,
+        InterestStock.stock_code == request.stock_code
+    ).first()
+    
+    if existing_interest:
+        raise HTTPException(status_code=400, detail="이미 관심종목으로 등록된 종목입니다")
+    
+    # 4. 관심종목 추가
+    new_interest = InterestStock(
+        user_id=user.id,
+        stock_code=request.stock_code
+    )
+    
+    db.add(new_interest)
+    db.commit()
+    db.refresh(new_interest)
+    
+    return {
+        "message": "관심종목이 성공적으로 추가되었습니다",
+        "interest": {
+            "stock_code": stock.code,
+            "company_name": stock.company_name
+        }
+    }
+
+@router.delete("/interests",summary="관심종목 삭제",response_model=schemas.InterestStockRemoveResponse)
+def remove_interest_stock(request: schemas.InterestStockRemoveRequest, db: Session = Depends(get_db)):
+    # 1. userID로 사용자 조회
+    user = db.query(User).filter(User.userID == request.userID).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="해당 사용자를 찾을 수 없습니다")
+    
+    # 2. 관심종목이 존재하는지 확인
+    existing_interest = db.query(InterestStock).filter(
+        InterestStock.user_id == user.id,
+        InterestStock.stock_code == request.stock_code
+    ).first()
+    
+    if not existing_interest:
+        raise HTTPException(status_code=404, detail="관심종목으로 등록되지 않은 종목입니다")
+    
+    # 3. 관심종목 삭제
+    db.delete(existing_interest)
+    db.commit()
+    
+    return {
+        "message": "관심종목이 성공적으로 삭제되었습니다"
+    }

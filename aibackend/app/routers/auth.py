@@ -62,4 +62,17 @@ def logout():
     )
     response.delete_cookie("username")
     return response
+
+@router.get("/check", summary="인증 상태 확인 API")
+def check_auth(request: Request):
+    username = request.cookies.get("username")
+    if username:
+        return JSONResponse(
+            content={"isAuthenticated": True, "username": username},
+            status_code=200
+        )
+    return JSONResponse(
+        content={"isAuthenticated": False},
+        status_code=401
+    )
     

@@ -93,3 +93,22 @@ class InterestStockInfo(BaseModel):
     
 class InterestStockResponse(BaseModel):
     interests: List[InterestStockInfo]
+
+# 관심종목 추가 요청 스키마
+class InterestStockAddRequest(BaseModel):
+    userID: str
+    stock_code: str
+
+# 관심종목 추가 응답 스키마  
+class InterestStockAddResponse(BaseModel):
+    message: str
+    interest: InterestStockInfo
+
+# 관심종목 삭제 요청 스키마
+class InterestStockRemoveRequest(BaseModel):
+    userID: str
+    stock_code: str
+
+# 관심종목 삭제 응답 스키마
+class InterestStockRemoveResponse(BaseModel):
+    message: str
