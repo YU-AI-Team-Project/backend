@@ -1,7 +1,12 @@
-from sqlalchemy import Integer, String, Boolean, ForeignKey, Text, BigInteger, Float, Date, DateTime, DECIMAL
+from sqlalchemy import Integer, String, Boolean, ForeignKey, Text, BigInteger, Float, Date, DateTime, DECIMAL, Enum
 from sqlalchemy.orm import mapped_column, relationship
 from .database import Base
+import enum
 
+class ChatRole(enum.Enum):
+    USER = "user"
+    GPT = "gpt"
+    
 # 사용자 테이블
 class User(Base):
     __tablename__ = "users"
@@ -10,6 +15,8 @@ class User(Base):
     passwd = mapped_column(String(50), nullable=False)
     
     interests = relationship("InterestStock", back_populates="user", cascade="all, delete-orphan")
+    chat_histories = relationship("ChatHistory", back_populates="user", cascade="all, delete-orphan")
+
 
 # 종목 테이블
 class Stock(Base):
@@ -26,6 +33,9 @@ class Stock(Base):
     financial_statements = relationship("FinancialStatement", back_populates="stock", cascade="all, delete-orphan")
     market_indicators = relationship("MarketIndicator", back_populates="stock", cascade="all, delete-orphan")
     earnings_forecasts = relationship("EarningsForecast", back_populates="stock", cascade="all, delete-orphan")
+    chat_histories = relationship("ChatHistory", back_populates="stock", cascade="all, delete-orphan")
+    reports = relationship("Reports", back_populates="stock", cascade="all, delete-orphan")
+
 
 # 관심종목 테이블
 class InterestStock(Base):
@@ -128,3 +138,27 @@ class EarningsForecast(Base):
     created_at = mapped_column(DateTime)
 
     stock = relationship("Stock", back_populates="earnings_forecasts")
+    
+    
+class Reports(Base):
+    __tablename__ = "reports"
+    
+    id = mapped_column(BigInteger,primary_key=True,autoincrement=True)
+    stock_code = mapped_column(String(20),ForeignKey("stocks.code"), nullable=False)
+    report = mapped_column(Text)
+    created_at = mapped_column(DateTime)
+    
+    stock = relationship("Stock", back_populates="reports")
+    
+class ChatHistory(Base):
+    __tablename__ = "chat_history"
+    
+    id = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    user_id = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
+    stock_code = mapped_column(String(20), ForeignKey("stocks.code"), nullable=False)
+    role = mapped_column(Enum(ChatRole), nullable=False)
+    chat = mapped_column(Text)
+    created_at = mapped_column(DateTime)
+    
+    user = relationship("User", back_populates="chat_histories")
+    stock = relationship("Stock", back_populates="chat_histories")
