@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 from typing import List, Optional
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 
 class StockBase(BaseModel):
@@ -112,3 +112,13 @@ class InterestStockRemoveRequest(BaseModel):
 # 관심종목 삭제 응답 스키마
 class InterestStockRemoveResponse(BaseModel):
     message: str
+    
+class ReportCreate(BaseModel):
+    stock_code: str
+    report: str
+    
+class ReportRead(BaseModel):
+    id: int
+    stock_code: str
+    report: str
+    created_at: datetime
