@@ -126,15 +126,34 @@ def get_my_interest_stocks(userID:str, db: Session = Depends(get_db)):
     )
     
     # 관심종목이 없어도 빈 배열 반환
-    result = [
-        schemas.InterestStockInfo(
+    result = []
+    for i in interests:
+        # 각 관심종목의 최신 시장지표 정보 가져오기
+        latest_indicator = (
+            db.query(MarketIndicator)
+            .filter(MarketIndicator.stock_code == i.stock_code)
+            .order_by(MarketIndicator.date.desc())
+            .first()
+        )
+        
+        # 기본 정보
+        stock_info = schemas.InterestStockInfo(
             stock_code=i.stock_code,
             company_name=i.stock.company_name
         )
-        for i in interests
-    ]
+        
+        # 시장지표 정보가 있으면 추가
+        if latest_indicator:
+            stock_info.current_price = latest_indicator.current_price
+            stock_info.previous_close = latest_indicator.previous_close
+            stock_info.day_change = latest_indicator.current_price - latest_indicator.previous_close if latest_indicator.current_price and latest_indicator.previous_close else 0
+            stock_info.day_change_percent = round(((latest_indicator.current_price - latest_indicator.previous_close) / latest_indicator.previous_close * 100), 2) if latest_indicator.current_price and latest_indicator.previous_close else 0
+            stock_info.volume = latest_indicator.volume
+            stock_info.market_cap = latest_indicator.market_cap
+        
+        result.append(stock_info)
     
-    return {"interests":result}
+    return {"interests": result}
 
 @router.post("/interests",summary="관심종목 추가",response_model=schemas.InterestStockAddResponse)
 def add_interest_stock(request: schemas.InterestStockAddRequest, db: Session = Depends(get_db)):

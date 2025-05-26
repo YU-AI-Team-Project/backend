@@ -8,3 +8,4 @@ python-multipart
 psycopg2-binary
 pgvector
 tqdm
+openai

@@ -91,6 +91,12 @@ class StockDetailResponse(BaseModel):
 class InterestStockInfo(BaseModel):
     stock_code: str
     company_name: str
+    current_price: Optional[Decimal] = None
+    previous_close: Optional[Decimal] = None
+    day_change: Optional[Decimal] = None
+    day_change_percent: Optional[float] = None
+    volume: Optional[int] = None
+    market_cap: Optional[float] = None
     
 class InterestStockResponse(BaseModel):
     interests: List[InterestStockInfo]
