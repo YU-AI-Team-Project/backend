@@ -1,7 +1,8 @@
 from pydantic import BaseModel
 from typing import List, Optional
-from datetime import date
+from datetime import date,datetime
 from decimal import Decimal
+from enum import Enum
 
 class StockBase(BaseModel):
     code: str
@@ -112,3 +113,19 @@ class InterestStockRemoveRequest(BaseModel):
 # 관심종목 삭제 응답 스키마
 class InterestStockRemoveResponse(BaseModel):
     message: str
+    
+class ChatRoleEnum(str, Enum):
+    user = "user"
+    gpt = "gpt"
+    
+class ChatRequest(BaseModel):
+    user_id : int
+    stock_code: str
+    role: ChatRoleEnum
+    chat: str
+    
+class ChatResponse(BaseModel):
+    id: int
+    role: ChatRoleEnum
+    chat: str
+    created_at: datetime
