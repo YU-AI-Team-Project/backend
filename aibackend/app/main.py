@@ -3,7 +3,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from aibackend.app import models
 from aibackend.app.database import engine
-from aibackend.app.routers import auth, stock_info
+from aibackend.app.routers import auth, stock_info, chat
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
@@ -21,6 +21,7 @@ app.add_middleware(
 #router폴더 생성해서 기능별 API 관리
 app.include_router(auth.router, prefix="/auth")
 app.include_router(stock_info.router, prefix="/stocks")
+app.include_router(chat.router, prefix="/chats", tags=["채팅 관련"])
 
 #--------------------------배포용--------------------------------
 # React 정적 파일 제공
