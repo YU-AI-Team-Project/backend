@@ -24,7 +24,7 @@ DB_URL = f"mysql+pymysql://{user}:{passwd}@/{db}?unix_socket={unix_socket_path}&
 
 #--------------------------로컬 환경에서 사용--------------------------------
 
-DB_URL = f"mysql+pymysql://{user}:{passwd}@{host}:{port}/{db}?charset=utf8mb4"
+#DB_URL = f"mysql+pymysql://{user}:{passwd}@{host}:{port}/{db}?charset=utf8mb4"
 
 #--------------------------로컬 환경에서 사용--------------------------------
 
