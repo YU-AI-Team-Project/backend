@@ -601,7 +601,7 @@ class RAGService:
     def chat_with_rag(
         self,
         user_query: str,
-        user_id: int,
+        user_id: str,
         stock_code: str = None,
         news_db: Session = None,
         main_db: Session = None,
@@ -612,12 +612,23 @@ class RAGService:
         try:
             print(f"채팅 RAG 시작: {user_query}", flush=True)
             
+            # userID로 사용자 테이블 ID 조회
+            user_table_id = None
+            if main_db and user_id:
+                from ..models import User
+                user = main_db.query(User).filter(User.userID == user_id).first()
+                if user:
+                    user_table_id = user.id
+                    print(f"사용자 ID 조회 완료: {user_id} -> {user_table_id}", flush=True)
+                else:
+                    print(f"사용자를 찾을 수 없음: {user_id}", flush=True)
+            
             # 1. DB에서 채팅 내역 가져오기
             chat_history = []
-            if main_db and stock_code:
+            if main_db and stock_code and user_table_id:
                 from ..models import ChatHistory
                 recent_chats = main_db.query(ChatHistory).filter(
-                    ChatHistory.user_id == user_id,
+                    ChatHistory.user_id == user_table_id,
                     ChatHistory.stock_code == stock_code
                 ).order_by(ChatHistory.created_at.desc()).limit(40).all()
                 
@@ -677,6 +688,7 @@ class RAGService:
                 for i, doc in enumerate(similar_docs, 1):
                     news_summaries.append(f"{i}. 제목: {doc['title']}\n   내용: {doc['content'][:300]}...\n   발행일: {doc['published_at']}")
                 news_context = "\n".join(news_summaries)
+                print(f"뉴스 컨텍스트: {news_context}", flush=True)
             else:
                 news_context = "관련 뉴스를 찾을 수 없습니다."
             
@@ -688,6 +700,7 @@ class RAGService:
                     role = "user" if chat["role"] == "user" else "gpt"
                     chat_messages.append(f"{role}: {chat['content']}")
                 chat_context = "\n".join(chat_messages)
+                print(f"이전 대화 내역: {chat_context}", flush=True)
             else:
                 chat_context = "이전 대화 없음"
             
@@ -695,6 +708,7 @@ class RAGService:
             report_context = ""
             if stock_report and stock_code:
                 report_context = f"[{stock_code} 분석 보고서]:\n{stock_report}"
+                print(f"주식 보고서: {report_context}", flush=True)
             else:
                 report_context = "관련 분석 보고서 없음"
             

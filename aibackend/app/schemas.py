@@ -125,7 +125,7 @@ class ChatRoleEnum(str, Enum):
     gpt = "gpt"
     
 class ChatRequest(BaseModel):
-    user_id : int
+    userID : str
     stock_code: str
     role: ChatRoleEnum
     chat: str

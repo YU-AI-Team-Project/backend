@@ -15,7 +15,7 @@ router = APIRouter()
 
 # RAG 채팅용 스키마
 class RagChatRequest(BaseModel):
-    user_id: int
+    userID: str
     stock_code: Optional[str] = None
     message: str
 
@@ -38,7 +38,7 @@ def chat_with_rag(
         # RAG 서비스로 응답 생성 (DB에서 직접 채팅 내역과 보고서 가져옴)
         result = rag_service.chat_with_rag(
             user_query=request.message,
-            user_id=request.user_id,
+            user_id=request.userID,
             stock_code=request.stock_code,
             news_db=news_db,
             main_db=main_db,
@@ -48,9 +48,9 @@ def chat_with_rag(
         
         # 채팅 기록 저장 (사용자 메시지)
         if request.stock_code:
-            save_chat(request.user_id, request.stock_code, ChatRole.USER, request.message)
+            save_chat(request.userID, request.stock_code, ChatRole.USER, request.message)
             # AI 응답도 저장
-            save_chat(request.user_id, request.stock_code, ChatRole.ASSISTANT, result["response"])
+            save_chat(request.userID, request.stock_code, ChatRole.GPT, result["response"])
         
         return RagChatResponse(**result)
         
@@ -65,21 +65,21 @@ def chat_with_rag(
             error=str(e)
         )
 
-@router.get("/",summary="채팅 기록 불러오기", response_model=List[ChatResponse])
+@router.get("/{userID}/{stock_code}",summary="채팅 기록 불러오기", response_model=List[ChatResponse])
 def get_chats(
-    user_id: int = Query(...),
-    stock_code: str = Query(...),
-    limit: int = 100
+    userID: str,
+    stock_code: str,
+    limit: int = Query(100)
 ):
-    chats = get_recent_chats(user_id,stock_code,limit)
+    chats = get_recent_chats(userID,stock_code,limit)
     return chats
 
 @router.post("/",summary="채팅 기록 저장하기", response_model=ChatResponse)
 def post_chat(request: ChatRequest):
-    chat = save_chat(request.user_id, request.stock_code, ChatRole(request.role), request.chat)
+    chat = save_chat(request.userID, request.stock_code, ChatRole(request.role), request.chat)
     return chat
 
-@router.delete("/", summary="채팅 기록 삭제하기")
-def clear_chat_history(user_id: int = Query(...), stock_code: str = Query(...)):
-    delete_chats(user_id, stock_code)
+@router.delete("/{userID}/{stock_code}", summary="채팅 기록 삭제하기")
+def clear_chat_history(userID: str, stock_code: str):
+    delete_chats(userID, stock_code)
     return {"message": "채팅 기록이 삭제됐습니다."}
