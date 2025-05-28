@@ -42,8 +42,8 @@ def chat_with_rag(
             stock_code=request.stock_code,
             news_db=news_db,
             main_db=main_db,
-            top_k=10,
-            similarity_threshold=0.6
+            top_k=25,
+            similarity_threshold=0.2
         )
         
         # 채팅 기록 저장 (사용자 메시지)

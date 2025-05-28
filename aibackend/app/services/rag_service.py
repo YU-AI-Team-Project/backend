@@ -4,7 +4,7 @@ from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import func, text
 from dotenv import load_dotenv
-from aibackend.app.news_vector import NewsVector
+from aibackend.app.news_vector import chunkVector
 from aibackend.app.news_vector_db import get_news_db
 
 load_dotenv()
@@ -40,11 +40,12 @@ class RAGService:
         query: str, 
         db: Session, 
         top_k: int = 100,
-        similarity_threshold: float = 0.7
+        similarity_threshold: float = 0.3
     ) -> List[Dict[str, Any]]:
         """쿼리와 유사한 뉴스 기사들을 벡터 검색으로 찾기"""
         try:
             # 쿼리 임베딩
+            print(f"벡터 검색 시작 - 쿼리: {query}", flush=True)
             query_embedding = self.get_embedding(query)
             if not query_embedding:
                 print("임베딩 결과가 비어있음", flush=True)
@@ -52,21 +53,70 @@ class RAGService:
             
             print(f"벡터 검색 시작 - 임베딩 길이: {len(query_embedding)}", flush=True)
             
+            # 먼저 데이터베이스에 데이터가 있는지 확인
+            count_query = text("SELECT COUNT(*) as total FROM news_chunks")
+            count_result = db.execute(count_query).fetchone()
+            total_chunks = count_result.total if count_result else 0
+            print(f"데이터베이스 총 청크 수: {total_chunks}", flush=True)
+            
+            if total_chunks == 0:
+                print("❌ news_chunks 테이블에 데이터가 없습니다!", flush=True)
+                return []
+            
             # pgvector의 코사인 유사도 검색
             # 벡터를 문자열로 변환하여 전달
             embedding_str = '[' + ','.join(map(str, query_embedding)) + ']'
             print(f"벡터 문자열 생성 완료 - 길이: {len(embedding_str)}", flush=True)
             
-            query_text = text("""
-                SELECT id, title, content, published_at,
+            # 먼저 임계값 없이 상위 결과들 확인
+            debug_query = text("""
+                SELECT id, title, chunk_text, published_at,
                        1 - (embedding <=> CAST(:query_embedding AS vector)) as similarity
-                FROM news_vectors
+                FROM news_chunks
+                ORDER BY embedding <=> CAST(:query_embedding AS vector)
+                LIMIT 5
+            """)
+            
+            print("디버그용 상위 5개 결과 확인 시작", flush=True)
+            debug_result = db.execute(debug_query, {"query_embedding": embedding_str})
+            
+            debug_docs = []
+            for row in debug_result:
+                debug_docs.append({
+                    "similarity": float(row.similarity),
+                    "title": row.title[:100] + "..." if len(row.title) > 100 else row.title
+                })
+            
+            print(f"상위 5개 결과의 유사도: {[doc['similarity'] for doc in debug_docs]}", flush=True)
+            print(f"상위 5개 결과의 제목: {[doc['title'] for doc in debug_docs]}", flush=True)
+            
+            # 동적 임계값 조정
+            if debug_docs:
+                max_similarity = max([doc['similarity'] for doc in debug_docs])
+                print(f"최고 유사도: {max_similarity}", flush=True)
+                
+                # 최고 유사도가 임계값보다 낮으면 임계값을 낮춤
+                if max_similarity < similarity_threshold:
+                    adjusted_threshold = max(0.05, max_similarity - 0.15)  # 더 관대하게 조정
+                    print(f"임계값 조정: {similarity_threshold} -> {adjusted_threshold}", flush=True)
+                    similarity_threshold = adjusted_threshold
+                else:
+                    # 충분한 결과를 얻기 위해 임계값을 더 낮춤 (청크 기반이므로)
+                    adjusted_threshold = max(0.1, similarity_threshold - 0.2)
+                    print(f"청크 검색을 위한 임계값 완화: {similarity_threshold} -> {adjusted_threshold}", flush=True)
+                    similarity_threshold = adjusted_threshold
+            
+            # 실제 검색 쿼리
+            query_text = text("""
+                SELECT id, title, chunk_text, published_at,
+                       1 - (embedding <=> CAST(:query_embedding AS vector)) as similarity
+                FROM news_chunks
                 WHERE 1 - (embedding <=> CAST(:query_embedding AS vector)) > :threshold
                 ORDER BY embedding <=> CAST(:query_embedding AS vector)
                 LIMIT :limit
             """)
             
-            print("SQL 쿼리 실행 시작", flush=True)
+            print(f"SQL 쿼리 실행 시작 - 임계값: {similarity_threshold}", flush=True)
             result = db.execute(
                 query_text,
                 {
@@ -84,12 +134,15 @@ class RAGService:
                 similar_docs.append({
                     "id": str(row.id),
                     "title": row.title,
-                    "content": row.content,
+                    "content": row.chunk_text,
                     "published_at": row.published_at.isoformat() if row.published_at else None,
                     "similarity": float(row.similarity)
                 })
             
-            print(f"결과 처리 완료 - {row_count}개 행", flush=True)
+            print(f"최종 결과 처리 완료 - {row_count}개 행, 임계값: {similarity_threshold}", flush=True)
+            if similar_docs:
+                print(f"반환된 결과의 유사도 범위: {min([doc['similarity'] for doc in similar_docs]):.3f} ~ {max([doc['similarity'] for doc in similar_docs]):.3f}", flush=True)
+            
             return similar_docs
             
         except Exception as e:
@@ -106,8 +159,8 @@ class RAGService:
         queries.append({
             "query": stock_code,
             "type": "stock_code",
-            "top_k": 10,
-            "threshold": 0.7
+            "top_k": 25,  # 10 → 25
+            "threshold": 0.6  # 0.7 → 0.6
         })
         
         if stock:
@@ -116,8 +169,8 @@ class RAGService:
                 queries.append({
                     "query": stock.company_name,
                     "type": "company_name", 
-                    "top_k": 8,
-                    "threshold": 0.6
+                    "top_k": 20,  # 8 → 20
+                    "threshold": 0.5  # 0.6 → 0.5
                 })
                 
                 # 3. 회사명 + 주요 키워드 조합
@@ -131,8 +184,8 @@ class RAGService:
                     queries.append({
                         "query": keyword,
                         "type": "company_keyword",
-                        "top_k": 5,
-                        "threshold": 0.5
+                        "top_k": 15,  # 5 → 15
+                        "threshold": 0.4  # 0.5 → 0.4
                     })
             
             # 4. 업종/섹터 관련 검색 (낮은 정확도, 넓은 범위)
@@ -140,16 +193,16 @@ class RAGService:
                 queries.append({
                     "query": f"{stock.industry} 업종",
                     "type": "industry",
-                    "top_k": 5,
-                    "threshold": 0.4
+                    "top_k": 12,  # 5 → 12
+                    "threshold": 0.3  # 0.4 → 0.3
                 })
                 
             if stock.sector:
                 queries.append({
                     "query": f"{stock.sector} 섹터",
                     "type": "sector", 
-                    "top_k": 5,
-                    "threshold": 0.4
+                    "top_k": 12,  # 5 → 12
+                    "threshold": 0.3  # 0.4 → 0.3
                 })
             
             # 5. 사업 영역 관련 검색
@@ -160,8 +213,8 @@ class RAGService:
                     queries.append({
                         "query": keyword,
                         "type": "business_keyword",
-                        "top_k": 4,
-                        "threshold": 0.4
+                        "top_k": 10,  # 4 → 10
+                        "threshold": 0.3  # 0.4 → 0.3
                     })
         
         # 6. 일반적인 주식 관련 키워드 (종목코드와 함께)
@@ -175,8 +228,8 @@ class RAGService:
             queries.append({
                 "query": keyword,
                 "type": "analysis_keyword",
-                "top_k": 3,
-                "threshold": 0.5
+                "top_k": 8,  # 3 → 8
+                "threshold": 0.4  # 0.5 → 0.4
             })
         
         return queries
@@ -228,29 +281,51 @@ class RAGService:
                 # 각 쿼리로 검색하여 결과 수집
                 all_docs = []
                 for i, query_info in enumerate(search_queries):
-                    print(f"검색 {i+1}/{len(search_queries)}: {query_info['query']}", flush=True)
+                    print(f"🔍 검색 {i+1}/{len(search_queries)}: {query_info['query']} (타입: {query_info['type']})", flush=True)
+                    print(f"   요청 top_k: {query_info['top_k']}, threshold: {query_info['threshold']}", flush=True)
+                    
                     docs = self.similarity_search(
                         query=query_info["query"],
                         db=news_db,
                         top_k=query_info["top_k"],
                         similarity_threshold=query_info["threshold"]
                     )
-                    print(f"검색 결과: {len(docs)}개", flush=True)
+                    print(f"   ✅ 실제 검색 결과: {len(docs)}개", flush=True)
+                    if docs:
+                        print(f"   📊 유사도 범위: {min([d['similarity'] for d in docs]):.3f} ~ {max([d['similarity'] for d in docs]):.3f}", flush=True)
+                    
                     # 쿼리 타입 정보 추가
                     for doc in docs:
                         doc["query_type"] = query_info["type"]
                     all_docs.extend(docs)
+                    print(f"   📈 누적 문서 수: {len(all_docs)}개", flush=True)
+                
+                print(f"🎯 전체 검색 완료 - 총 수집된 문서: {len(all_docs)}개", flush=True)
                 
                 # 중복 제거 (ID 기준)
                 seen_ids = set()
                 similar_docs = []
+                duplicate_count = 0
                 for doc in all_docs:
                     if doc["id"] not in seen_ids:
                         seen_ids.add(doc["id"])
                         similar_docs.append(doc)
+                    else:
+                        duplicate_count += 1
                 
-                # 유사도 기준으로 정렬하고 상위 20개만 선택
-                similar_docs = sorted(similar_docs, key=lambda x: x["similarity"], reverse=True)[:20]
+                print(f"🔄 중복 제거 완료 - 제거된 중복: {duplicate_count}개, 남은 고유 문서: {len(similar_docs)}개", flush=True)
+                
+                # 유사도 기준으로 정렬하고 상위 40개만 선택 (청크 기반이므로 더 많이)
+                similar_docs = sorted(similar_docs, key=lambda x: x["similarity"], reverse=True)[:40]
+                print(f"🏆 최종 선택된 문서: {len(similar_docs)}개", flush=True)
+                if similar_docs:
+                    print(f"📊 최종 유사도 범위: {min([d['similarity'] for d in similar_docs]):.3f} ~ {max([d['similarity'] for d in similar_docs]):.3f}", flush=True)
+                    # 쿼리 타입별 분포 확인
+                    type_counts = {}
+                    for doc in similar_docs:
+                        query_type = doc.get("query_type", "unknown")
+                        type_counts[query_type] = type_counts.get(query_type, 0) + 1
+                    print(f"📋 쿼리 타입별 분포: {type_counts}", flush=True)
                 print(similar_docs)
             
             elif news_db:
@@ -258,8 +333,8 @@ class RAGService:
                 similar_docs = self.similarity_search(
                     query=stock_code,
                     db=news_db,
-                    top_k=15,
-                    similarity_threshold=0.5
+                    top_k=30,  # 15 → 30
+                    similarity_threshold=0.4  # 0.5 → 0.4
                 )
             
             # 뉴스가 없어도 재무 데이터만으로 분석 진행
@@ -612,8 +687,8 @@ class RAGService:
         stock_code: str = None,
         news_db: Session = None,
         main_db: Session = None,
-        top_k: int = 5,
-        similarity_threshold: float = 0.6
+        top_k: int = 25,  # 10 → 25 (청크 기반이므로 더 많이)
+        similarity_threshold: float = 0.2  # 0.3 → 0.2 (더 많은 청크 검색)
     ) -> Dict[str, Any]:
         """사용자 질문에 대해 RAG를 활용한 채팅 응답 생성"""
         try:
@@ -664,13 +739,16 @@ class RAGService:
             # 3. 사용자 질문과 관련된 뉴스 검색
             similar_docs = []
             if news_db:
+                print(f"🔍 chat_with_rag에서 검색 요청 - top_k: {top_k}, threshold: {similarity_threshold}", flush=True)
                 similar_docs = self.similarity_search(
                     query=user_query,
                     db=news_db,
                     top_k=top_k,
                     similarity_threshold=similarity_threshold
                 )
-                print(f"검색된 뉴스 수: {len(similar_docs)}", flush=True)
+                print(f"🎯 chat_with_rag 검색 완료 - 검색된 뉴스 수: {len(similar_docs)}", flush=True)
+                if similar_docs:
+                    print(f"📊 chat_with_rag 유사도 범위: {min([d['similarity'] for d in similar_docs]):.3f} ~ {max([d['similarity'] for d in similar_docs]):.3f}", flush=True)
             
             # 2. 채팅용 시스템 프롬프트
             chat_system_prompt = """당신은 금융 전문가입니다. 사용자의 질문에 대해 제공된 정보들을 바탕으로 정확하고 도움이 되는 답변을 제공하세요.
