@@ -40,7 +40,7 @@ class RAGService:
         query: str, 
         db: Session, 
         top_k: int = 100,
-        similarity_threshold: float = 0.5
+        similarity_threshold: float = 0.3
     ) -> List[Dict[str, Any]]:
         """쿼리와 유사한 뉴스 기사들을 벡터 검색으로 찾기"""
         try:
@@ -281,29 +281,51 @@ class RAGService:
                 # 각 쿼리로 검색하여 결과 수집
                 all_docs = []
                 for i, query_info in enumerate(search_queries):
-                    print(f"검색 {i+1}/{len(search_queries)}: {query_info['query']}", flush=True)
+                    print(f"🔍 검색 {i+1}/{len(search_queries)}: {query_info['query']} (타입: {query_info['type']})", flush=True)
+                    print(f"   요청 top_k: {query_info['top_k']}, threshold: {query_info['threshold']}", flush=True)
+                    
                     docs = self.similarity_search(
                         query=query_info["query"],
                         db=news_db,
                         top_k=query_info["top_k"],
                         similarity_threshold=query_info["threshold"]
                     )
-                    print(f"검색 결과: {len(docs)}개", flush=True)
+                    print(f"   ✅ 실제 검색 결과: {len(docs)}개", flush=True)
+                    if docs:
+                        print(f"   📊 유사도 범위: {min([d['similarity'] for d in docs]):.3f} ~ {max([d['similarity'] for d in docs]):.3f}", flush=True)
+                    
                     # 쿼리 타입 정보 추가
                     for doc in docs:
                         doc["query_type"] = query_info["type"]
                     all_docs.extend(docs)
+                    print(f"   📈 누적 문서 수: {len(all_docs)}개", flush=True)
+                
+                print(f"🎯 전체 검색 완료 - 총 수집된 문서: {len(all_docs)}개", flush=True)
                 
                 # 중복 제거 (ID 기준)
                 seen_ids = set()
                 similar_docs = []
+                duplicate_count = 0
                 for doc in all_docs:
                     if doc["id"] not in seen_ids:
                         seen_ids.add(doc["id"])
                         similar_docs.append(doc)
+                    else:
+                        duplicate_count += 1
+                
+                print(f"🔄 중복 제거 완료 - 제거된 중복: {duplicate_count}개, 남은 고유 문서: {len(similar_docs)}개", flush=True)
                 
                 # 유사도 기준으로 정렬하고 상위 40개만 선택 (청크 기반이므로 더 많이)
                 similar_docs = sorted(similar_docs, key=lambda x: x["similarity"], reverse=True)[:40]
+                print(f"🏆 최종 선택된 문서: {len(similar_docs)}개", flush=True)
+                if similar_docs:
+                    print(f"📊 최종 유사도 범위: {min([d['similarity'] for d in similar_docs]):.3f} ~ {max([d['similarity'] for d in similar_docs]):.3f}", flush=True)
+                    # 쿼리 타입별 분포 확인
+                    type_counts = {}
+                    for doc in similar_docs:
+                        query_type = doc.get("query_type", "unknown")
+                        type_counts[query_type] = type_counts.get(query_type, 0) + 1
+                    print(f"📋 쿼리 타입별 분포: {type_counts}", flush=True)
                 print(similar_docs)
             
             elif news_db:
@@ -710,13 +732,16 @@ class RAGService:
             # 3. 사용자 질문과 관련된 뉴스 검색
             similar_docs = []
             if news_db:
+                print(f"🔍 chat_with_rag에서 검색 요청 - top_k: {top_k}, threshold: {similarity_threshold}", flush=True)
                 similar_docs = self.similarity_search(
                     query=user_query,
                     db=news_db,
                     top_k=top_k,
                     similarity_threshold=similarity_threshold
                 )
-                print(f"검색된 뉴스 수: {len(similar_docs)}", flush=True)
+                print(f"🎯 chat_with_rag 검색 완료 - 검색된 뉴스 수: {len(similar_docs)}", flush=True)
+                if similar_docs:
+                    print(f"📊 chat_with_rag 유사도 범위: {min([d['similarity'] for d in similar_docs]):.3f} ~ {max([d['similarity'] for d in similar_docs]):.3f}", flush=True)
             
             # 2. 채팅용 시스템 프롬프트
             chat_system_prompt = """당신은 금융 전문가입니다. 사용자의 질문에 대해 제공된 정보들을 바탕으로 정확하고 도움이 되는 답변을 제공하세요.
