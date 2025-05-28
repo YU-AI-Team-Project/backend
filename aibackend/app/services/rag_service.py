@@ -97,8 +97,13 @@ class RAGService:
                 
                 # 최고 유사도가 임계값보다 낮으면 임계값을 낮춤
                 if max_similarity < similarity_threshold:
-                    adjusted_threshold = max(0.1, max_similarity - 0.1)
+                    adjusted_threshold = max(0.05, max_similarity - 0.15)  # 더 관대하게 조정
                     print(f"임계값 조정: {similarity_threshold} -> {adjusted_threshold}", flush=True)
+                    similarity_threshold = adjusted_threshold
+                else:
+                    # 충분한 결과를 얻기 위해 임계값을 더 낮춤 (청크 기반이므로)
+                    adjusted_threshold = max(0.1, similarity_threshold - 0.2)
+                    print(f"청크 검색을 위한 임계값 완화: {similarity_threshold} -> {adjusted_threshold}", flush=True)
                     similarity_threshold = adjusted_threshold
             
             # 실제 검색 쿼리
@@ -654,7 +659,7 @@ class RAGService:
         news_db: Session = None,
         main_db: Session = None,
         top_k: int = 25,  # 10 → 25 (청크 기반이므로 더 많이)
-        similarity_threshold: float = 0.3
+        similarity_threshold: float = 0.2  # 0.3 → 0.2 (더 많은 청크 검색)
     ) -> Dict[str, Any]:
         """사용자 질문에 대해 RAG를 활용한 채팅 응답 생성"""
         try:
