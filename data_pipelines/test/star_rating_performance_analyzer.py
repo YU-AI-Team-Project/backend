@@ -37,58 +37,17 @@ class StarRatingPerformanceAnalyzer:
         print(f"분석 기간: {self.start_date} ~ {self.end_date}")
         
     def extract_star_rating(self, report_content: str) -> int:
-        """보고서 내용에서 별점 추출"""
+        """보고서 내용에서 별점 추출 - 노란 별(⭐) 개수만 세기"""
         try:
-            # 투자 매력도 패턴 찾기
-            patterns = [
-                r'투자 매력도[:：]\s*([⭐★✦]+)\s*\(\d+점?\)',  # 투자 매력도: ⭐⭐⭐⭐ (4점)
-                r'투자 매력도[:：]\s*([⭐★✦]+)',
-                r'투자 매력도[:：]\s*([⭐★✦]{1,5})',
-                r'매력도[:：]\s*([⭐★✦]+)\s*\(\d+점?\)',      # 매력도: ⭐⭐⭐ (3점)
-                r'매력도[:：]\s*([⭐★✦]+)',
-                r'([⭐★✦]{1,5})\s*\(5점 만점\)',
-                r'([⭐★✦]{1,5})\s*\(\d+점?\)',              # ⭐⭐⭐⭐ (4점)
-                r'([⭐★✦]{1,5})\s*\/\s*5',
-                r'([⭐★✦]{5})'
-            ]
+            # 노란 별(⭐) 개수 세기
+            star_count = report_content.count('⭐')
             
-            for pattern in patterns:
-                match = re.search(pattern, report_content)
-                if match:
-                    stars = match.group(1)
-                    # 별 문자 개수 세기
-                    star_count = len([c for c in stars if c in '⭐★✦'])
-                    if 1 <= star_count <= 5:
-                        print(f"별점 발견: {stars} ({star_count}개)")
-                        return star_count
-            
-            # 숫자로 표현된 평점 찾기
-            number_patterns = [
-                r'투자 매력도[:：]\s*([⭐★✦]+)\s*\((\d)점?\)',  # 별 + (숫자점) 조합에서 숫자 추출
-                r'매력도[:：]\s*([⭐★✦]+)\s*\((\d)점?\)',      # 매력도 + 별 + (숫자점)
-                r'투자 매력도[:：]\s*(\d)\s*\/\s*5',
-                r'투자 매력도[:：]\s*(\d)\s*점',
-                r'매력도[:：]\s*(\d)\s*점',
-                r'(\d)\s*점\s*만점',
-                r'\((\d)점\)',                                  # 단순히 (4점) 형태
-                r'(\d)\s*\/\s*5점?'                            # 4/5 형태
-            ]
-            
-            for pattern in number_patterns:
-                match = re.search(pattern, report_content)
-                if match:
-                    # 그룹이 2개면 두 번째 그룹(숫자)을 사용, 1개면 첫 번째 그룹 사용
-                    if len(match.groups()) >= 2 and match.group(2):
-                        rating = int(match.group(2))
-                    else:
-                        rating = int(match.group(1))
-                    
-                    if 1 <= rating <= 5:
-                        print(f"숫자 평점 발견: {rating}점 (패턴: {pattern})")
-                        return rating
-            
-            print("별점을 찾을 수 없음")
-            return 0
+            if 1 <= star_count <= 5:
+                print(f"노란 별 개수: {star_count}개")
+                return star_count
+            else:
+                print(f"노란 별 개수가 범위를 벗어남: {star_count}개")
+                return 0
             
         except Exception as e:
             print(f"별점 추출 실패: {e}")

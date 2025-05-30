@@ -2,6 +2,7 @@ import openai
 import os
 import csv
 import pandas as pd
+import glob
 from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import func, text, create_engine
@@ -456,7 +457,7 @@ class HistoricalReportGenerator:
                 response = self.openai_client.chat.completions.create(
                     model=self.chat_model,
                     messages=messages,
-                    temperature=0,  # 최대 일관성
+                    temperature=0.4,  # 최대 일관성
                     max_tokens=12000
                 )
                 print(f"GPT 과거 분석 완료: {stock_code}")
@@ -528,12 +529,84 @@ class HistoricalReportGenerator:
             print(f"CSV 저장 실패: {e}")
             return None
     
+    def report_exists(self, stock_code: str, output_dir: str = "data") -> bool:
+        """특정 종목의 보고서가 이미 존재하는지 확인"""
+        try:
+            # 현재 스크립트 파일 위치 기준으로 절대경로 생성
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            if not os.path.isabs(output_dir):
+                output_dir = os.path.join(script_dir, output_dir, "historical_reports")
+            
+            # 해당 종목의 보고서 파일 패턴 검색
+            pattern = os.path.join(output_dir, f"historical_report_{stock_code}_*.csv")
+            existing_files = glob.glob(pattern)
+            
+            if existing_files:
+                print(f"⏭️ {stock_code}: 기존 보고서 발견, 건너뜀 ({len(existing_files)}개 파일)")
+                return True
+            return False
+            
+        except Exception as e:
+            print(f"기존 보고서 확인 실패: {e}")
+            return False
+    
+    def batch_process_stocks(self, all_stock_codes: List[str], batch_size: int = 50, output_dir: str = "data", auto_mode: bool = False):
+        """주식 리스트를 배치로 나누어 처리"""
+        # 배치로 나누기
+        batches = [all_stock_codes[i:i + batch_size] for i in range(0, len(all_stock_codes), batch_size)]
+        
+        print(f"📦 전체 {len(all_stock_codes)}개 종목을 {len(batches)}개 배치로 분할 (배치당 {batch_size}개)")
+        print(f"🤖 자동 모드: {'ON' if auto_mode else 'OFF'}")
+        
+        all_results = []
+        
+        for batch_num, batch_stocks in enumerate(batches, 1):
+            print(f"\n🚀 배치 {batch_num}/{len(batches)} 시작 (종목 {len(batch_stocks)}개)")
+            print(f"📋 배치 종목: {batch_stocks[:5]}{'...' if len(batch_stocks) > 5 else ''}")
+            
+            # 사용자 확인 받기 (자동 모드가 아닌 경우만)
+            if not auto_mode:
+                response = input(f"배치 {batch_num} 실행하시겠습니까? (y/n/q): ").lower()
+                
+                if response == 'q':
+                    print("사용자 요청으로 전체 작업을 중단합니다.")
+                    break
+                elif response != 'y':
+                    print(f"배치 {batch_num} 건너뜀")
+                    continue
+            
+            # 배치 실행
+            batch_results = self.batch_generate_reports(batch_stocks, output_dir)
+            all_results.extend(batch_results)
+            
+            # 배치 완료 요약
+            success_count = sum(1 for r in batch_results if r["success"])
+            print(f"✅ 배치 {batch_num} 완료: 성공 {success_count}/{len(batch_results)}개")
+            
+            # 비용 추정 (대략적)
+            estimated_cost = len(batch_results) * 0.15  # 종목당 약 $0.15
+            total_estimated = len(all_results) * 0.15
+            print(f"💰 배치 비용: ${estimated_cost:.2f} | 누적 비용: ${total_estimated:.2f}")
+            
+            # 다음 배치 전 확인 (자동 모드가 아닌 경우만)
+            if batch_num < len(batches) and not auto_mode:
+                print(f"\n⏸️ 배치 {batch_num} 완료. 다음 배치로 진행하시겠습니까?")
+        
+        return all_results
+    
     def batch_generate_reports(self, stock_codes: List[str], output_dir: str = "data"):
         """여러 종목에 대한 일괄 보고서 생성"""
         results = []
+        skipped_count = 0
         
         for i, stock_code in enumerate(stock_codes, 1):
             print(f"보고서 생성 진행: {i}/{len(stock_codes)} - {stock_code}")
+            
+            # 기존 보고서 존재 여부 확인
+            if self.report_exists(stock_code, output_dir):
+                # 기존 보고서가 있으면 건너뜀 (결과에는 추가하지 않음)
+                skipped_count += 1
+                continue
             
             # 보고서 생성
             report_data = self.generate_historical_report(stock_code)
@@ -551,11 +624,11 @@ class HistoricalReportGenerator:
                 print(f"❌ {stock_code} 보고서 생성 실패")
         
         # 전체 결과 요약 CSV 생성
-        self.save_batch_summary(results, output_dir)
+        self.save_batch_summary(results, output_dir, skipped_count)
         
         return results
     
-    def save_batch_summary(self, results: List[Dict[str, Any]], output_dir: str):
+    def save_batch_summary(self, results: List[Dict[str, Any]], output_dir: str, skipped_count: int):
         """일괄 처리 결과 요약 CSV 저장"""
         try:
             # 현재 스크립트 파일 위치 기준으로 절대경로 생성
@@ -577,7 +650,8 @@ class HistoricalReportGenerator:
                     "financial_periods": result["financial_periods"],
                     "generated_at": result["generated_at"],
                     "csv_path": result.get("csv_path", ""),
-                    "error": result.get("error", "")
+                    "error": result.get("error", ""),
+                    "skipped": result["success"] is False
                 })
             
             # DataFrame으로 변환하여 저장
@@ -598,6 +672,7 @@ class HistoricalReportGenerator:
             print(f"  - 실패: {total_count - success_count}개")
             print(f"  - 총 뉴스 수: {total_news}개")
             print(f"  - 총 재무 기간 수: {total_financial_periods}개")
+            print(f"  - 건너뜀: {skipped_count}개")
             
         except Exception as e:
             print(f"요약 CSV 저장 실패: {e}")
@@ -608,15 +683,15 @@ def main():
     # 보고서 생성기 초기화
     generator = HistoricalReportGenerator()
     
-    # config에서 랜덤 SP500 종목 50개 가져오기
-    from config_historical import get_random_sp500_tickers
+    # config에서 SP500에서 중복 제외하고 랜덤 50개 종목 가져오기
+    from config_historical import get_random_sp500_tickers_excluding_existing
     
-    # SP500에서 랜덤 250개 종목 선택
-    test_stock_codes = get_random_sp500_tickers(250)
+    # SP500에서 중복 제외하고 랜덤 50개 종목 선택
+    test_stock_codes = get_random_sp500_tickers_excluding_existing(50, "data")
     
     print("과거 데이터 기반 보고서 생성 시작")
-    print(f"대상 종목: 랜덤 SP500 250개")
-    print(f"선택된 종목 처음 10개: {test_stock_codes[:10]}")
+    print(f"대상 종목: SP500에서 중복 제외하고 랜덤 50개")
+    print(f"선택된 종목: {test_stock_codes}")
     print(f"분석 기준: 2024년 이전 데이터")
     
     # 현재 스크립트 파일과 같은 위치에 data 폴더 생성
@@ -625,9 +700,17 @@ def main():
     
     print(f"출력 위치: {output_dir}")
     
-    # 일괄 보고서 생성
-    results = generator.batch_generate_reports(
-        stock_codes=test_stock_codes,
+    # 배치 처리 설정 (50개 전체를 한 배치로 처리)
+    BATCH_SIZE = 50  # 전체 50개를 한 번에 처리
+    AUTO_MODE = True  # 50개만 처리하므로 자동 모드로 설정
+    
+    print(f"⚙️ 배치 설정: 전체 50개를 1개 배치로 처리, 자동모드: ON")
+    
+    # 배치별 보고서 생성 (실제로는 1개 배치)
+    results = generator.batch_process_stocks(
+        all_stock_codes=test_stock_codes,
+        batch_size=BATCH_SIZE,
+        auto_mode=AUTO_MODE,
         output_dir=output_dir
     )
     

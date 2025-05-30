@@ -5,6 +5,7 @@ import os
 import csv
 import random
 from datetime import date
+import glob
 
 def load_sp500_tickers():
     """SP500 티커 목록을 CSV 파일에서 로드"""
@@ -33,6 +34,53 @@ def load_sp500_tickers():
             "005380",  # 현대차
             "012330",  # 현대모비스
         ]
+
+def get_random_sp500_tickers_excluding_existing(count: int = 50, output_dir: str = "data"):
+    """이미 보고서가 있는 티커를 제외하고 SP500에서 랜덤 선택"""
+    # 전체 SP500 티커 로드
+    all_tickers = load_sp500_tickers()
+    
+    # 현재 스크립트 파일 위치 기준으로 절대경로 생성
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    if not os.path.isabs(output_dir):
+        reports_dir = os.path.join(current_dir, output_dir, "historical_reports")
+    else:
+        reports_dir = output_dir
+    
+    # 기존 보고서에서 티커 추출
+    existing_tickers = set()
+    if os.path.exists(reports_dir):
+        pattern = os.path.join(reports_dir, "historical_report_*.csv")
+        existing_files = glob.glob(pattern)
+        
+        for file_path in existing_files:
+            # 파일명에서 티커 추출: historical_report_AAPL_20241130_123456.csv
+            filename = os.path.basename(file_path)
+            parts = filename.split('_')
+            if len(parts) >= 3:
+                ticker = parts[2]  # AAPL 부분
+                existing_tickers.add(ticker)
+    
+    # 중복 제거: 전체 티커에서 기존 티커 제외
+    available_tickers = [ticker for ticker in all_tickers if ticker not in existing_tickers]
+    
+    print(f"전체 SP500 티커: {len(all_tickers)}개")
+    print(f"기존 보고서 티커: {len(existing_tickers)}개")
+    print(f"사용 가능한 티커: {len(available_tickers)}개")
+    
+    if len(available_tickers) < count:
+        print(f"⚠️ 요청된 개수({count})가 사용 가능한 티커 수({len(available_tickers)})보다 많습니다.")
+        print(f"사용 가능한 모든 티커({len(available_tickers)}개)를 반환합니다.")
+        selected_tickers = available_tickers
+    else:
+        selected_tickers = random.sample(available_tickers, count)
+    
+    print(f"새로 선택된 티커 {len(selected_tickers)}개: {selected_tickers[:5]}{'...' if len(selected_tickers) > 5 else ''}")
+    
+    if existing_tickers:
+        print(f"제외된 기존 티커 예시: {list(existing_tickers)[:5]}{'...' if len(existing_tickers) > 5 else ''}")
+    
+    return selected_tickers
 
 def get_random_sp500_tickers(count: int = 50):
     """SP500 티커에서 랜덤하게 선택"""

@@ -631,8 +631,8 @@ class RAGService:
             response = self.openai_client.chat.completions.create(
                 model=self.chat_model,
                 messages=messages,
-                temperature=0.7,
-                max_tokens=10000
+                temperature=0.4,
+                max_tokens=15000
             )
             print(f"GPT 분석 완료: {stock_code}", flush=True)
             
@@ -822,7 +822,7 @@ class RAGService:
             response = self.openai_client.chat.completions.create(
                 model=self.chat_model,
                 messages=messages,
-                temperature=0.7,
+                temperature=0.4,
                 max_tokens=10000,
                 timeout=30
             )
