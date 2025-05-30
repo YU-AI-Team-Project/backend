@@ -68,10 +68,210 @@ class HistoricalReportGenerator:
             print(f"임베딩 생성 실패: {e}")
             return []
     
+    def _generate_diverse_queries(self, stock_code: str, stock_info=None) -> List[Dict[str, Any]]:
+        """주식 분석을 위한 다양한 검색 쿼리 생성 (과거 데이터용)"""
+        queries = []
+        
+        # 1. 기본 종목 코드 검색 (높은 정확도)
+        queries.append({
+            "query": stock_code,
+            "type": "stock_code",
+            "top_k": 15,
+            "threshold": 0.5
+        })
+        
+        if stock_info:
+            # 2. 회사명 검색 (중간 정확도)
+            if stock_info.get("company_name"):
+                queries.append({
+                    "query": stock_info["company_name"],
+                    "type": "company_name", 
+                    "top_k": 12,
+                    "threshold": 0.4
+                })
+                
+                # 3. 회사명 + 주요 키워드 조합
+                company_keywords = [
+                    f"{stock_info['company_name']} 실적",
+                    f"{stock_info['company_name']} 전망",
+                    f"{stock_info['company_name']} 투자",
+                    f"{stock_info['company_name']} 주가"
+                ]
+                for keyword in company_keywords:
+                    queries.append({
+                        "query": keyword,
+                        "type": "company_keyword",
+                        "top_k": 8,
+                        "threshold": 0.3
+                    })
+            
+            # 4. 업종/섹터 관련 검색
+            if stock_info.get("industry"):
+                queries.append({
+                    "query": f"{stock_info['industry']} 업종",
+                    "type": "industry",
+                    "top_k": 8,
+                    "threshold": 0.25
+                })
+                
+            if stock_info.get("sector"):
+                queries.append({
+                    "query": f"{stock_info['sector']} 섹터",
+                    "type": "sector", 
+                    "top_k": 8,
+                    "threshold": 0.25
+                })
+            
+            # 5. 사업 영역 관련 검색
+            if stock_info.get("business_summary"):
+                business_keywords = self._extract_business_keywords(stock_info["business_summary"])
+                for keyword in business_keywords[:2]:  # 상위 2개만
+                    queries.append({
+                        "query": keyword,
+                        "type": "business_keyword",
+                        "top_k": 6,
+                        "threshold": 0.25
+                    })
+        
+        # 6. 일반적인 주식 관련 키워드
+        general_keywords = [
+            f"{stock_code} 분석",
+            f"{stock_code} 리포트"
+        ]
+        for keyword in general_keywords:
+            queries.append({
+                "query": keyword,
+                "type": "analysis_keyword",
+                "top_k": 5,
+                "threshold": 0.3
+            })
+        
+        return queries
+    
+    def _extract_business_keywords(self, business_summary: str) -> List[str]:
+        """사업 요약에서 주요 키워드 추출"""
+        if not business_summary:
+            return []
+        
+        # 주요 사업 관련 키워드들
+        business_terms = [
+            "반도체", "메모리", "디스플레이", "스마트폰", "전자", "IT", "소프트웨어",
+            "바이오", "제약", "화학", "석유", "자동차", "조선", "건설", "금융",
+            "은행", "증권", "보험", "통신", "게임", "엔터테인먼트", "유통",
+            "식품", "음료", "의류", "화장품", "항공", "물류", "에너지",
+            "AI", "인공지능", "빅데이터", "클라우드", "5G", "IoT", "블록체인",
+            "technology", "software", "hardware", "semiconductor", "biotech",
+            "pharmaceutical", "automotive", "financial", "banking", "insurance"
+        ]
+        
+        found_keywords = []
+        business_lower = business_summary.lower()
+        
+        for term in business_terms:
+            if term in business_summary or term.lower() in business_lower:
+                found_keywords.append(term)
+        
+        return found_keywords[:5]  # 최대 5개까지
+
     def get_historical_news(self, stock_code: str, db_session: Session, limit: int = 50) -> List[Dict[str, Any]]:
-        """2024년 이전 뉴스 데이터 검색"""
+        """2024년 이전 뉴스 데이터 검색 (다양한 쿼리 사용)"""
         try:
-            # 2024년 이전 뉴스 청크 검색
+            # 1. 기업 기본 정보 가져오기 (MySQL에서)
+            stock_info = None
+            with Session(self.mysql_engine) as mysql_session:
+                stock_query = text("SELECT * FROM stocks WHERE code = :stock_code")
+                stock_result = mysql_session.execute(stock_query, {"stock_code": stock_code}).fetchone()
+                if stock_result:
+                    stock_info = dict(stock_result._mapping)
+            
+            # 2. 다양한 검색 쿼리 생성
+            search_queries = self._generate_diverse_queries(stock_code, stock_info)
+            print(f"생성된 검색 쿼리 수: {len(search_queries)} for {stock_code}")
+            
+            # 3. 각 쿼리로 검색하여 결과 수집
+            all_docs = []
+            for i, query_info in enumerate(search_queries):
+                print(f"🔍 검색 {i+1}/{len(search_queries)}: {query_info['query']} (타입: {query_info['type']})")
+                
+                # 2024년 이전 뉴스 청크 검색 with 벡터 유사도
+                query_text = text("""
+                    SELECT id, title, chunk_text, published_at,
+                           1 - (embedding <=> CAST(:query_embedding AS vector)) as similarity
+                    FROM news_chunks
+                    WHERE published_at < :cutoff_date
+                    AND 1 - (embedding <=> CAST(:query_embedding AS vector)) > :threshold
+                    ORDER BY embedding <=> CAST(:query_embedding AS vector)
+                    LIMIT :limit
+                """)
+                
+                # 쿼리 임베딩 생성
+                query_embedding = self.get_embedding(query_info["query"])
+                if not query_embedding:
+                    continue
+                
+                embedding_str = '[' + ','.join(map(str, query_embedding)) + ']'
+                
+                result = db_session.execute(
+                    query_text,
+                    {
+                        "query_embedding": embedding_str,
+                        "cutoff_date": self.cutoff_date,
+                        "threshold": query_info["threshold"],
+                        "limit": query_info["top_k"]
+                    }
+                )
+                
+                docs = []
+                for row in result:
+                    docs.append({
+                        "id": str(row.id),
+                        "title": row.title,
+                        "content": row.chunk_text,
+                        "published_at": row.published_at.isoformat() if row.published_at else None,
+                        "similarity": float(row.similarity),
+                        "query_type": query_info["type"]
+                    })
+                
+                print(f"   ✅ 검색 결과: {len(docs)}개")
+                if docs:
+                    print(f"   📊 유사도: {min([d['similarity'] for d in docs]):.3f} ~ {max([d['similarity'] for d in docs]):.3f}")
+                
+                all_docs.extend(docs)
+            
+            print(f"전체 검색 완료 - 총 문서: {len(all_docs)}개")
+            
+            # 4. 중복 제거 (ID 기준)
+            seen_ids = set()
+            historical_news = []
+            for doc in all_docs:
+                if doc["id"] not in seen_ids:
+                    seen_ids.add(doc["id"])
+                    historical_news.append(doc)
+            
+            # 5. 유사도 기준으로 정렬하고 상위 limit개만 선택
+            historical_news = sorted(historical_news, key=lambda x: x["similarity"], reverse=True)[:limit]
+            
+            print(f"2024년 이전 뉴스 검색 완료: {len(historical_news)}개 (중복 제거 후)")
+            if historical_news:
+                print(f"최종 유사도 범위: {min([d['similarity'] for d in historical_news]):.3f} ~ {max([d['similarity'] for d in historical_news]):.3f}")
+                
+                # 쿼리 타입별 분포 확인
+                type_counts = {}
+                for doc in historical_news:
+                    query_type = doc.get("query_type", "unknown")
+                    type_counts[query_type] = type_counts.get(query_type, 0) + 1
+                print(f"쿼리 타입별 분포: {type_counts}")
+            
+            return historical_news
+            
+        except Exception as e:
+            print(f"과거 뉴스 검색 실패: {e}")
+            # 실패시 기본 방식으로 대체
+            return self._fallback_news_search(stock_code, db_session, limit)
+    
+    def _fallback_news_search(self, stock_code: str, db_session: Session, limit: int = 50) -> List[Dict[str, Any]]:
+        """벡터 검색 실패시 기본 텍스트 검색"""
+        try:
             query_text = text("""
                 SELECT id, title, chunk_text, published_at
                 FROM news_chunks
@@ -96,14 +296,16 @@ class HistoricalReportGenerator:
                     "id": str(row.id),
                     "title": row.title,
                     "content": row.chunk_text,
-                    "published_at": row.published_at.isoformat() if row.published_at else None
+                    "published_at": row.published_at.isoformat() if row.published_at else None,
+                    "similarity": 0.5,  # 기본값
+                    "query_type": "fallback"
                 })
             
-            print(f"2024년 이전 뉴스 검색 완료: {len(historical_news)}개")
+            print(f"대체 검색 결과: {len(historical_news)}개")
             return historical_news
             
         except Exception as e:
-            print(f"과거 뉴스 검색 실패: {e}")
+            print(f"대체 검색도 실패: {e}")
             return []
     
     def get_historical_financial_data(self, stock_code: str, db_session: Session) -> Dict[str, Any]:
@@ -254,7 +456,7 @@ class HistoricalReportGenerator:
                 response = self.openai_client.chat.completions.create(
                     model=self.chat_model,
                     messages=messages,
-                    temperature=0.7,
+                    temperature=0,  # 최대 일관성
                     max_tokens=12000
                 )
                 print(f"GPT 과거 분석 완료: {stock_code}")
@@ -409,11 +611,11 @@ def main():
     # config에서 랜덤 SP500 종목 50개 가져오기
     from config_historical import get_random_sp500_tickers
     
-    # SP500에서 랜덤 50개 종목 선택
-    test_stock_codes = get_random_sp500_tickers(50)
+    # SP500에서 랜덤 250개 종목 선택
+    test_stock_codes = get_random_sp500_tickers(250)
     
     print("과거 데이터 기반 보고서 생성 시작")
-    print(f"대상 종목: 랜덤 SP500 50개")
+    print(f"대상 종목: 랜덤 SP500 250개")
     print(f"선택된 종목 처음 10개: {test_stock_codes[:10]}")
     print(f"분석 기준: 2024년 이전 데이터")
     

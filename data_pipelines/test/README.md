@@ -145,18 +145,17 @@ DEFAULT_CONFIG = {
 
 `yfinance_PriceCollector/sp500_tickers.csv` 파일에서 SP500 종목들을 자동으로 로드합니다:
 
-### 실행 모드별 종목 선택:
-- **기본 모드**: SP500에서 처음 5개 종목
-- **샘플 모드** (`--sample`): SP500에서 처음 10개 종목  
-- **일괄 모드** (`--batch`): 전체 SP500 종목 (약 500개)
-
-### 현재 SP500 첫 번째 종목들:
-- MMM (3M Company)
-- AOS (A. O. Smith)
-- ABT (Abbott)
-- ABBV (AbbVie)
-- ACN (Accenture)
-- 등등...
+### 샘플 종목들 (빠른 테스트용):
+- AAPL (Apple)
+- MSFT (Microsoft)
+- GOOGL (Alphabet)
+- AMZN (Amazon)
+- TSLA (Tesla)
+- META (Meta)
+- NVDA (NVIDIA)
+- JPM (JPMorgan Chase)
+- JNJ (Johnson & Johnson)
+- V (Visa)
 
 ### 전체 SP500:
 - 총 500여개 종목 자동 로드

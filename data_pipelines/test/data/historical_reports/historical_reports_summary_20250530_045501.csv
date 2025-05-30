@@ -1,6 +1,0 @@
-stock_code,success,news_count,financial_periods,generated_at,csv_path,error
-MMM,True,0,3,2025-05-30T04:52:08.848597,/home/kimjigwang/Documents/2025-1/대학/인공지능/backend/data_pipelines/test/data/historical_reports/historical_report_MMM_20250530_045209.csv,
-AOS,True,0,3,2025-05-30T04:52:34.957971,/home/kimjigwang/Documents/2025-1/대학/인공지능/backend/data_pipelines/test/data/historical_reports/historical_report_AOS_20250530_045235.csv,
-ABT,True,0,3,2025-05-30T04:53:05.406142,/home/kimjigwang/Documents/2025-1/대학/인공지능/backend/data_pipelines/test/data/historical_reports/historical_report_ABT_20250530_045305.csv,
-ABBV,True,0,3,2025-05-30T04:53:31.177044,/home/kimjigwang/Documents/2025-1/대학/인공지능/backend/data_pipelines/test/data/historical_reports/historical_report_ABBV_20250530_045331.csv,
-ACN,True,0,3,2025-05-30T04:55:01.129364,/home/kimjigwang/Documents/2025-1/대학/인공지능/backend/data_pipelines/test/data/historical_reports/historical_report_ACN_20250530_045501.csv,
