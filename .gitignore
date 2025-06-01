@@ -1,2 +1,6 @@
 .env
 **/__pycache__
+
+# Data directories
+data_pipelines/data/
+test/data/
